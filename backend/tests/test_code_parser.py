@@ -27,3 +27,39 @@ def test_parse_js_file_extracts_imports_defs_and_routes():
     assert "helper" in symbols.defined
     assert "ItemService" in symbols.defined
     assert ("GET", "/items") in symbols.routes
+
+
+def test_parse_python_file_extracts_function_line_spans_and_branch_counts():
+    symbols = parse_file(FIXTURES / "function_info" / "branchy.py")
+    assert symbols is not None
+    by_name = {f.name: f for f in symbols.functions}
+    assert by_name["classify"].start_line == 1
+    assert by_name["classify"].end_line == 7
+    assert by_name["classify"].branch_count == 2
+    assert by_name["simple"].start_line == 10
+    assert by_name["simple"].end_line == 11
+    assert by_name["simple"].branch_count == 0
+
+
+def test_parse_js_file_extracts_function_line_spans_and_branch_counts():
+    symbols = parse_file(FIXTURES / "function_info" / "branchy.js")
+    assert symbols is not None
+    by_name = {f.name: f for f in symbols.functions}
+    assert by_name["classify"].start_line == 1
+    assert by_name["classify"].end_line == 9
+    assert by_name["classify"].branch_count == 2
+    assert by_name["simple"].start_line == 11
+    assert by_name["simple"].end_line == 13
+    assert by_name["simple"].branch_count == 0
+
+
+def test_parse_python_file_extracts_class_names():
+    symbols = parse_file(FIXTURES / "python_symbols" / "sample.py")
+    assert symbols is not None
+    assert "ItemService" in symbols.class_names
+
+
+def test_parse_js_file_extracts_class_names():
+    symbols = parse_file(FIXTURES / "js_symbols" / "sample.js")
+    assert symbols is not None
+    assert "ItemService" in symbols.class_names

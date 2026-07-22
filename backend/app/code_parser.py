@@ -20,6 +20,38 @@ _ROUTE_PATTERN = re.compile(
 )
 
 
+_BRANCH_NODE_TYPES: dict[str, set[str]] = {
+    "python": {
+        "if_statement",
+        "elif_clause",
+        "for_statement",
+        "while_statement",
+        "except_clause",
+        "conditional_expression",
+    },
+    "javascript": {
+        "if_statement",
+        "for_statement",
+        "for_in_statement",
+        "while_statement",
+        "do_statement",
+        "switch_case",
+        "catch_clause",
+        "ternary_expression",
+    },
+}
+_BRANCH_NODE_TYPES["typescript"] = _BRANCH_NODE_TYPES["javascript"]
+_BRANCH_NODE_TYPES["tsx"] = _BRANCH_NODE_TYPES["javascript"]
+
+
+@dataclass
+class FunctionInfo:
+    name: str
+    start_line: int
+    end_line: int
+    branch_count: int
+
+
 @dataclass
 class FileSymbols:
     path: str
@@ -27,6 +59,8 @@ class FileSymbols:
     imports: list[str] = field(default_factory=list)
     defined: list[str] = field(default_factory=list)
     routes: list[tuple[str, str]] = field(default_factory=list)
+    functions: list[FunctionInfo] = field(default_factory=list)
+    class_names: list[str] = field(default_factory=list)
 
 
 def language_for(path: Path) -> str | None:
@@ -75,6 +109,65 @@ def _extract_defined(root, source: bytes, lang: str) -> list[str]:
     return defined
 
 
+def _count_branches(node, lang: str) -> int:
+    branch_types = _BRANCH_NODE_TYPES.get(lang, set())
+    count = 0
+
+    def walk(n):
+        nonlocal count
+        if n.type in branch_types:
+            count += 1
+        for child in n.children:
+            walk(child)
+
+    walk(node)
+    return count
+
+
+def _extract_functions(root, source: bytes, lang: str) -> list[FunctionInfo]:
+    functions: list[FunctionInfo] = []
+    target_types = ("function_definition",) if lang == "python" else ("function_declaration",)
+
+    def walk(node):
+        if node.type in target_types:
+            name = None
+            for child in node.children:
+                if child.type in ("identifier", "type_identifier"):
+                    name = _text(child, source)
+                    break
+            if name:
+                functions.append(
+                    FunctionInfo(
+                        name=name,
+                        start_line=node.start_point[0] + 1,
+                        end_line=node.end_point[0] + 1,
+                        branch_count=_count_branches(node, lang),
+                    )
+                )
+        for child in node.children:
+            walk(child)
+
+    walk(root)
+    return functions
+
+
+def _extract_class_names(root, source: bytes, lang: str) -> list[str]:
+    class_types = ("class_definition",) if lang == "python" else ("class_declaration",)
+    names: list[str] = []
+
+    def walk(node):
+        if node.type in class_types:
+            for child in node.children:
+                if child.type in ("identifier", "type_identifier"):
+                    names.append(_text(child, source))
+                    break
+        for child in node.children:
+            walk(child)
+
+    walk(root)
+    return names
+
+
 def parse_file(path: Path) -> FileSymbols | None:
     lang = language_for(path)
     if lang is None:
@@ -86,4 +179,14 @@ def parse_file(path: Path) -> FileSymbols | None:
     defined = _extract_defined(tree.root_node, source, lang)
     raw_routes = _ROUTE_PATTERN.findall(source.decode("utf-8", errors="ignore"))
     routes = [(method.upper(), route_path) for method, route_path in raw_routes]
-    return FileSymbols(path=str(path), language=lang, imports=imports, defined=defined, routes=routes)
+    functions = _extract_functions(tree.root_node, source, lang)
+    class_names = _extract_class_names(tree.root_node, source, lang)
+    return FileSymbols(
+        path=str(path),
+        language=lang,
+        imports=imports,
+        defined=defined,
+        routes=routes,
+        functions=functions,
+        class_names=class_names,
+    )
