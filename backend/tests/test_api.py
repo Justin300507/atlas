@@ -43,3 +43,31 @@ def test_analyze_returns_422_on_clone_failure(monkeypatch):
 
     resp = client.post("/analyze", json={"repo_url": "https://github.com/example/does-not-exist"})
     assert resp.status_code == 422
+
+
+def test_analyze_skips_unparseable_file_and_continues(monkeypatch, tmp_path):
+    good_file = tmp_path / "good.py"
+    good_file.write_text("import os\n\n\ndef ok():\n    pass\n")
+    bad_file = tmp_path / "bad.py"
+    bad_file.write_text("def broken():\n    pass\n")
+
+    from app.code_parser import parse_file as real_parse_file
+
+    @contextmanager
+    def fake_clone(url, timeout=60):
+        yield tmp_path
+
+    def flaky_parse_file(path):
+        if path.name == "bad.py":
+            raise RuntimeError("simulated parse failure")
+        return real_parse_file(path)
+
+    monkeypatch.setattr("app.main.shallow_clone", fake_clone)
+    monkeypatch.setattr("app.main.parse_file", flaky_parse_file)
+
+    resp = client.post("/analyze", json={"repo_url": "https://github.com/example/example"})
+    assert resp.status_code == 200
+    body = resp.json()
+    node_ids = {n["id"] for n in body["graph"]["nodes"]}
+    assert str(good_file) in node_ids
+    assert str(bad_file) not in node_ids
