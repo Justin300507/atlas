@@ -42,9 +42,10 @@ def _resolve_import_target(imp: str, files: list[FileSymbols]) -> str | None:
     module_as_path = module.replace(".", "/")
     for f in files:
         candidate = PurePath(f.path).as_posix()
-        if candidate.endswith(module_as_path + ".py"):
-            return f.path
-        if candidate.endswith(module_as_path + ".js") or candidate.endswith(module_as_path + ".ts"):
+        if any(
+            candidate.endswith(module_as_path + suffix)
+            for suffix in (".py", ".js", ".ts", ".jsx", ".tsx")
+        ):
             return f.path
     return None
 

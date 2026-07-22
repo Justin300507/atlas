@@ -57,3 +57,36 @@ def test_build_graph_resolves_imports_with_native_path_separators(tmp_path):
 
     edge_triples = {(e["source"], e["target"], e["type"]) for e in data["edges"]}
     assert (str(main_path), str(services_path), "import") in edge_triples
+
+
+def test_build_graph_resolves_import_to_tsx_and_jsx_targets():
+    files = [
+        FileSymbols(
+            path="src/App.tsx",
+            language="tsx",
+            imports=["./components/Button", "./components/Widget"],
+            defined=["App"],
+            routes=[],
+        ),
+        FileSymbols(
+            path="src/components/Button.tsx",
+            language="tsx",
+            imports=[],
+            defined=["Button"],
+            routes=[],
+        ),
+        FileSymbols(
+            path="src/components/Widget.jsx",
+            language="javascript",
+            imports=[],
+            defined=["Widget"],
+            routes=[],
+        ),
+    ]
+
+    graph = build_graph(files)
+    data = to_node_link(graph)
+
+    edge_triples = {(e["source"], e["target"], e["type"]) for e in data["edges"]}
+    assert ("src/App.tsx", "src/components/Button.tsx", "import") in edge_triples
+    assert ("src/App.tsx", "src/components/Widget.jsx", "import") in edge_triples
