@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import PurePath
 
 import networkx as nx
 
@@ -40,9 +41,10 @@ def _resolve_import_target(imp: str, files: list[FileSymbols]) -> str | None:
         return None
     module_as_path = module.replace(".", "/")
     for f in files:
-        if f.path.endswith(module_as_path + ".py"):
+        candidate = PurePath(f.path).as_posix()
+        if candidate.endswith(module_as_path + ".py"):
             return f.path
-        if f.path.endswith(module_as_path + ".js") or f.path.endswith(module_as_path + ".ts"):
+        if candidate.endswith(module_as_path + ".js") or candidate.endswith(module_as_path + ".ts"):
             return f.path
     return None
 
