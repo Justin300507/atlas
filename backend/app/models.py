@@ -28,6 +28,21 @@ class GraphResponse(BaseModel):
     edges: list[GraphEdge]
 
 
+class QualityIssue(BaseModel):
+    file: str
+    line: int
+    kind: str
+    message: str
+    severity: str
+
+
+class QualityReport(BaseModel):
+    overall_score: int
+    maintainability_score: int
+    architecture_score: int
+    issues: list[QualityIssue]
+
+
 class AnalyzeRequest(BaseModel):
     repo_url: str
 
@@ -35,3 +50,4 @@ class AnalyzeRequest(BaseModel):
 class AnalyzeResponse(BaseModel):
     stack: StackReport
     graph: GraphResponse
+    quality: QualityReport
