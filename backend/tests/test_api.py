@@ -71,3 +71,44 @@ def test_analyze_skips_unparseable_file_and_continues(monkeypatch, tmp_path):
     node_ids = {n["id"] for n in body["graph"]["nodes"]}
     assert str(good_file) in node_ids
     assert str(bad_file) not in node_ids
+
+
+def test_analyze_skips_oversized_file_and_keeps_others(monkeypatch, tmp_path):
+    from app.main import _MAX_FILE_SIZE_BYTES
+
+    good_file = tmp_path / "good.py"
+    good_file.write_text("import os\n\n\ndef ok():\n    pass\n")
+    big_file = tmp_path / "big.py"
+    big_file.write_bytes(b"x" * (_MAX_FILE_SIZE_BYTES + 1))
+
+    @contextmanager
+    def fake_clone(url, timeout=60):
+        yield tmp_path
+
+    monkeypatch.setattr("app.main.shallow_clone", fake_clone)
+
+    resp = client.post("/analyze", json={"repo_url": "https://github.com/example/example"})
+    assert resp.status_code == 200
+    body = resp.json()
+    node_ids = {n["id"] for n in body["graph"]["nodes"]}
+    assert str(good_file) in node_ids
+    assert str(big_file) not in node_ids
+
+
+def test_analyze_stops_walking_after_max_file_count(monkeypatch, tmp_path):
+    for i in range(5):
+        (tmp_path / f"mod_{i}.py").write_text(f"x = {i}\n")
+
+    monkeypatch.setattr("app.main._MAX_FILES_PER_REPO", 2)
+
+    @contextmanager
+    def fake_clone(url, timeout=60):
+        yield tmp_path
+
+    monkeypatch.setattr("app.main.shallow_clone", fake_clone)
+
+    resp = client.post("/analyze", json={"repo_url": "https://github.com/example/example"})
+    assert resp.status_code == 200
+    body = resp.json()
+    module_nodes = [n for n in body["graph"]["nodes"] if n["type"] == "module"]
+    assert len(module_nodes) == 2

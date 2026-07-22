@@ -15,6 +15,13 @@ app = FastAPI(title="Atlas Repository Intelligence")
 
 _EXCLUDED_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__", "dist", "build"}
 
+# Bounds on parsing arbitrary cloned repos: this endpoint clones and parses
+# arbitrary public repo URLs with no auth, so a pathological repo (one huge
+# file, or hundreds of thousands of files) must not be able to exhaust
+# memory/CPU.
+_MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024  # skip individual files larger than this
+_MAX_FILES_PER_REPO = 5000  # stop walking a repo after yielding this many files
+
 
 @app.get("/health")
 def health() -> dict:
@@ -22,11 +29,20 @@ def health() -> dict:
 
 
 def _iter_source_files(repo_path: Path):
+    count = 0
     for path in repo_path.rglob("*"):
+        if count >= _MAX_FILES_PER_REPO:
+            return
         if not path.is_file():
             continue
         if any(part in _EXCLUDED_DIRS for part in path.parts):
             continue
+        try:
+            if path.stat().st_size > _MAX_FILE_SIZE_BYTES:
+                continue
+        except OSError:
+            continue
+        count += 1
         yield path
 
 
