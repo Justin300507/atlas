@@ -9,6 +9,7 @@ from .cloner import CloneError, InvalidRepoUrlError, shallow_clone
 from .code_parser import parse_file
 from .graph_builder import build_graph, to_node_link
 from .models import AnalyzeRequest, AnalyzeResponse, GraphResponse
+from .quality_engine import analyze_quality
 from .stack_detector import detect
 
 app = FastAPI(title="Atlas Repository Intelligence")
@@ -60,7 +61,12 @@ def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
                 if symbols is not None:
                     files.append(symbols)
             graph = build_graph(files)
-            return AnalyzeResponse(stack=stack, graph=GraphResponse(**to_node_link(graph)))
+            quality = analyze_quality(files, graph)
+            return AnalyzeResponse(
+                stack=stack,
+                graph=GraphResponse(**to_node_link(graph)),
+                quality=quality,
+            )
     except InvalidRepoUrlError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except subprocess.TimeoutExpired as exc:

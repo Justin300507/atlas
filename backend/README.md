@@ -22,6 +22,10 @@ curl -X POST http://127.0.0.1:8000/analyze \
   -d "{\"repo_url\": \"https://github.com/octocat/Hello-World\"}"
 ```
 
+The response now also includes a `quality` field: `overall_score`,
+`maintainability_score`, `architecture_score`, and a list of `issues` (circular
+imports, long functions, high-complexity functions, naming violations).
+
 ## Test
 
 ```bash

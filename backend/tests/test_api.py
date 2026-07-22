@@ -29,6 +29,8 @@ def test_analyze_returns_stack_and_graph(monkeypatch):
     assert body["stack"]["backend"] == "FastAPI"
     assert body["stack"]["deployment"] == "Docker"
     assert len(body["graph"]["nodes"]) > 0
+    assert "quality" in body
+    assert "overall_score" in body["quality"]
 
 
 def test_analyze_returns_422_on_clone_failure(monkeypatch):
@@ -71,6 +73,8 @@ def test_analyze_skips_unparseable_file_and_continues(monkeypatch, tmp_path):
     node_ids = {n["id"] for n in body["graph"]["nodes"]}
     assert str(good_file) in node_ids
     assert str(bad_file) not in node_ids
+    assert "quality" in body
+    assert "overall_score" in body["quality"]
 
 
 def test_analyze_skips_oversized_file_and_keeps_others(monkeypatch, tmp_path):
@@ -93,6 +97,8 @@ def test_analyze_skips_oversized_file_and_keeps_others(monkeypatch, tmp_path):
     node_ids = {n["id"] for n in body["graph"]["nodes"]}
     assert str(good_file) in node_ids
     assert str(big_file) not in node_ids
+    assert "quality" in body
+    assert "overall_score" in body["quality"]
 
 
 def test_analyze_stops_walking_after_max_file_count(monkeypatch, tmp_path):
@@ -112,3 +118,26 @@ def test_analyze_stops_walking_after_max_file_count(monkeypatch, tmp_path):
     body = resp.json()
     module_nodes = [n for n in body["graph"]["nodes"] if n["type"] == "module"]
     assert len(module_nodes) == 2
+    assert "quality" in body
+    assert "overall_score" in body["quality"]
+
+
+def test_analyze_quality_report_has_expected_shape(monkeypatch):
+    fixture = FIXTURES / "fastapi_repo"
+
+    @contextmanager
+    def fake_clone(url, timeout=60):
+        yield fixture
+
+    monkeypatch.setattr("app.main.shallow_clone", fake_clone)
+
+    resp = client.post("/analyze", json={"repo_url": "https://github.com/example/example"})
+    assert resp.status_code == 200
+    quality = resp.json()["quality"]
+    assert set(quality.keys()) == {
+        "overall_score",
+        "maintainability_score",
+        "architecture_score",
+        "issues",
+    }
+    assert isinstance(quality["issues"], list)
