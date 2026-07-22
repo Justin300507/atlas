@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -29,6 +30,7 @@ def _clone_to(source: str, dest: str, timeout: int) -> None:
         capture_output=True,
         text=True,
         timeout=timeout,
+        env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
     )
     if result.returncode != 0:
         raise CloneError(result.stderr.strip() or "git clone failed")
