@@ -29,6 +29,7 @@ def generate_documentation(
         _dependency_diagram(graph),
         _risk_areas(repo_root, quality),
         _high_churn_components(git_report),
+        _analysis_coverage(),
     ]
     return "\n\n".join(sections) + "\n"
 
@@ -205,3 +206,27 @@ def _high_churn_components(git_report: GitIntelligenceReport) -> str:
     for churn in top:
         lines.append(f"| {churn.file} | {churn.commit_count} | {churn.bug_fix_count} |")
     return "\n".join(lines)
+
+
+def _analysis_coverage() -> str:
+    # A fixed, version-of-the-tool-level disclosure, not conditional on this
+    # specific repo's contents: every report should say the same thing about
+    # what Atlas can and can't see, so a reader knows what to trust before
+    # they've analyzed a second repo that might hit a gap this one didn't.
+    return "\n".join(
+        [
+            "## Analysis Coverage",
+            "",
+            "**Supported:**",
+            "- Python imports (absolute and relative)",
+            "- ES Module imports (JS/TS `import` syntax)",
+            "- Git history (commit churn, ownership, co-change)",
+            "- Repository structure and stack detection",
+            "",
+            "**Limitations:**",
+            "- CommonJS (`require()`) dependency analysis is not yet supported — "
+            "JS/TS import edges are currently ES-Module-only.",
+            "- Quality and architecture scores are heuristic engineering signals, "
+            "not guarantees of correctness or safety.",
+        ]
+    )

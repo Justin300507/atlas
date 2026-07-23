@@ -193,5 +193,20 @@ def test_empty_repo_renders_without_crashing():
         "## Dependency Diagram",
         "## Risk Areas",
         "## Recent High-Churn Components",
+        "## Analysis Coverage",
     ):
         assert header in doc
+
+
+def test_analysis_coverage_footer_discloses_support_and_limitations():
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_git()
+    )
+
+    assert "## Analysis Coverage" in doc
+    assert "Python imports" in doc
+    assert "ES Module" in doc
+    assert "Git history" in doc
+    assert "CommonJS" in doc
+    assert "not yet supported" in doc
+    assert "heuristic engineering signals" in doc
