@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
@@ -209,29 +210,25 @@ def test_git_intelligence_rejects_invalid_url():
 
 
 def test_documentation_returns_markdown_report(tmp_path, monkeypatch):
-    structure_fixture = FIXTURES / "fastapi_repo"
-
-    history_repo = tmp_path / "history_repo"
-    history_repo.mkdir()
-    subprocess.run(["git", "init"], cwd=history_repo, check=True, capture_output=True)
-    (history_repo / "a.py").write_text("1\n")
-    subprocess.run(["git", "add", "a.py"], cwd=history_repo, check=True, capture_output=True)
+    # run_full_analysis now clones once (via clone_with_history) and reuses
+    # that checkout for both structure and git-history analysis, so the
+    # fake needs a single directory that's both the real fixture's file tree
+    # and a real git repo.
+    combined_repo = tmp_path / "combined_repo"
+    shutil.copytree(FIXTURES / "fastapi_repo", combined_repo)
+    subprocess.run(["git", "init"], cwd=combined_repo, check=True, capture_output=True)
+    subprocess.run(["git", "add", "."], cwd=combined_repo, check=True, capture_output=True)
     subprocess.run(
         ["git", "-c", "user.email=test@test.com", "-c", "user.name=test", "commit", "-m", "init"],
-        cwd=history_repo,
+        cwd=combined_repo,
         check=True,
         capture_output=True,
     )
 
     @contextmanager
-    def fake_shallow_clone(url, timeout=60):
-        yield structure_fixture
-
-    @contextmanager
     def fake_clone_with_history(url, depth=500, timeout=120):
-        yield history_repo
+        yield combined_repo
 
-    monkeypatch.setattr("app.report_pipeline.shallow_clone", fake_shallow_clone)
     monkeypatch.setattr("app.report_pipeline.clone_with_history", fake_clone_with_history)
 
     resp = client.post("/documentation", json={"repo_url": "https://github.com/example/example"})
@@ -241,7 +238,7 @@ def test_documentation_returns_markdown_report(tmp_path, monkeypatch):
     assert "## API Reference" in markdown
     assert "/users" in markdown
     assert "Commits analyzed: 1" in markdown
-    assert "a.py" in markdown.split("## Recent High-Churn Components")[1]
+    assert "main.py" in markdown.split("## Recent High-Churn Components")[1]
 
 
 def test_documentation_rejects_invalid_url():
@@ -306,7 +303,6 @@ def test_get_job_includes_created_at_for_refresh_recovery(monkeypatch, tmp_path)
 def test_job_runs_synchronously_via_submit_override_and_reaches_done(monkeypatch, tmp_path):
     monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
 
-    structure_fixture = FIXTURES / "fastapi_repo"
     history_repo = tmp_path / "history_repo"
     history_repo.mkdir()
     subprocess.run(["git", "init"], cwd=history_repo, check=True, capture_output=True)
@@ -320,14 +316,9 @@ def test_job_runs_synchronously_via_submit_override_and_reaches_done(monkeypatch
     )
 
     @contextmanager
-    def fake_shallow_clone(url, timeout=60):
-        yield structure_fixture
-
-    @contextmanager
     def fake_clone_with_history(url, depth=500, timeout=120):
         yield history_repo
 
-    monkeypatch.setattr("app.report_pipeline.shallow_clone", fake_shallow_clone)
     monkeypatch.setattr("app.report_pipeline.clone_with_history", fake_clone_with_history)
     # Run the job inline instead of on a background thread, so the test is
     # deterministic — _submit_job and _run_job share the same (job_id,
@@ -390,17 +381,49 @@ def test_rate_limit_key_ignores_x_forwarded_for_header(monkeypatch, tmp_path):
     assert resp_b.status_code == 429
 
 
+def test_job_logs_stage_timings_on_completion(monkeypatch, tmp_path, caplog):
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+
+    history_repo = tmp_path / "history_repo"
+    history_repo.mkdir()
+    subprocess.run(["git", "init"], cwd=history_repo, check=True, capture_output=True)
+    (history_repo / "a.py").write_text("1\n")
+    subprocess.run(["git", "add", "a.py"], cwd=history_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=test@test.com", "-c", "user.name=test", "commit", "-m", "init"],
+        cwd=history_repo,
+        check=True,
+        capture_output=True,
+    )
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield history_repo
+
+    monkeypatch.setattr("app.report_pipeline.clone_with_history", fake_clone_with_history)
+    monkeypatch.setattr("app.main._submit_job", app_main._run_job)
+
+    with caplog.at_level("INFO", logger="app.main"):
+        create_resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
+    job_id = create_resp.json()["job_id"]
+
+    timing_records = [r for r in caplog.records if "stage timings" in r.getMessage()]
+    assert len(timing_records) == 1
+    assert job_id in timing_records[0].getMessage()
+    assert "total" in timing_records[0].getMessage()
+
+
 def test_job_records_error_on_clone_failure(monkeypatch, tmp_path):
     from app.cloner import CloneError
 
     monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
 
     @contextmanager
-    def failing_clone(url, timeout=60):
+    def failing_clone(url, depth=500, timeout=120):
         raise CloneError("repository not found")
         yield  # pragma: no cover
 
-    monkeypatch.setattr("app.report_pipeline.shallow_clone", failing_clone)
+    monkeypatch.setattr("app.report_pipeline.clone_with_history", failing_clone)
     monkeypatch.setattr("app.main._submit_job", app_main._run_job)
 
     create_resp = client.post("/jobs", json={"repo_url": "https://github.com/example/does-not-exist"})

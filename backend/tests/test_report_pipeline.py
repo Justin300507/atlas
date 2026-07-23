@@ -20,8 +20,9 @@ def test_analyze_structure_returns_stack_files_graph_and_quality():
 
 
 def test_on_stage_called_with_every_stage_in_order(monkeypatch, tmp_path):
-    structure_fixture = FIXTURES / "fastapi_repo"
-
+    # run_full_analysis clones once (via clone_with_history) and reuses that
+    # single checkout for both structure and git-history analysis -- there's
+    # no separate shallow_clone call to fake here anymore.
     history_repo = tmp_path / "history_repo"
     history_repo.mkdir()
     subprocess.run(["git", "init"], cwd=history_repo, check=True, capture_output=True)
@@ -35,14 +36,9 @@ def test_on_stage_called_with_every_stage_in_order(monkeypatch, tmp_path):
     )
 
     @contextmanager
-    def fake_shallow_clone(url, timeout=60):
-        yield structure_fixture
-
-    @contextmanager
     def fake_clone_with_history(url, depth=500, timeout=120):
         yield history_repo
 
-    monkeypatch.setattr("app.report_pipeline.shallow_clone", fake_shallow_clone)
     monkeypatch.setattr("app.report_pipeline.clone_with_history", fake_clone_with_history)
 
     stages_seen: list[str] = []
@@ -56,7 +52,6 @@ def test_on_stage_called_with_every_stage_in_order(monkeypatch, tmp_path):
         "building_graph",
         "analyzing_quality",
         "scanning_security",
-        "cloning_history",
         "analyzing_git_history",
         "generating_documentation",
     ]
@@ -67,14 +62,9 @@ def test_on_stage_is_optional(monkeypatch):
     fixture = FIXTURES / "fastapi_repo"
 
     @contextmanager
-    def fake_shallow_clone(url, timeout=60):
-        yield fixture
-
-    @contextmanager
     def fake_clone_with_history(url, depth=500, timeout=120):
         yield fixture
 
-    monkeypatch.setattr("app.report_pipeline.shallow_clone", fake_shallow_clone)
     monkeypatch.setattr("app.report_pipeline.clone_with_history", fake_clone_with_history)
 
     response = run_full_analysis("https://github.com/example/example")

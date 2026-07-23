@@ -1,9 +1,25 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import mermaid from "mermaid";
 
-mermaid.initialize({ startOnLoad: false });
+// mermaid (plus its per-diagram-type renderers, cytoscape, katex, etc.) is
+// one of the largest dependencies in this app by a wide margin, but most
+// reports render zero diagrams that need it before the user has even
+// submitted a URL. A dynamic import means it's only fetched the first time a
+// ```mermaid block actually needs rendering, not bundled into the initial
+// page load. The import is cached (repeated calls resolve the same module),
+// so this is safe to call from every MermaidBlock instance.
+let mermaidModulePromise: Promise<typeof import("mermaid")> | null = null;
+
+function loadMermaid() {
+  if (!mermaidModulePromise) {
+    mermaidModulePromise = import("mermaid").then((mod) => {
+      mod.default.initialize({ startOnLoad: false });
+      return mod;
+    });
+  }
+  return mermaidModulePromise;
+}
 
 let mermaidIdCounter = 0;
 
@@ -26,7 +42,10 @@ function MermaidBlock({ code }: { code: string }) {
     let cancelled = false;
     mermaidIdCounter += 1;
     const id = `atlas-mermaid-${mermaidIdCounter}`;
-    const task = renderQueue.then(() => mermaid.render(id, code));
+    const task = renderQueue.then(async () => {
+      const { default: mermaid } = await loadMermaid();
+      return mermaid.render(id, code);
+    });
     renderQueue = task.catch(() => undefined);
     task
       .then((result) => {

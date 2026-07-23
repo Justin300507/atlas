@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
@@ -31,6 +32,9 @@ from .report_pipeline import (
     analyze_structure,
     run_full_analysis,
 )
+from .timing import StageTimer
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Atlas Repository Intelligence")
 
@@ -128,10 +132,9 @@ def _submit_job(job_id: str, repo_url: str) -> None:
 
 def _run_job(job_id: str, repo_url: str) -> None:
     jobs.update_job(job_id, status="running")
+    timer = StageTimer(lambda stage: jobs.update_job(job_id, stage=stage))
     try:
-        response = run_full_analysis(
-            repo_url, on_stage=lambda stage: jobs.update_job(job_id, stage=stage)
-        )
+        response = run_full_analysis(repo_url, on_stage=timer)
         jobs.update_job(job_id, status="done", markdown=response.markdown)
     except InvalidRepoUrlError as exc:
         jobs.update_job(job_id, status="error", error=str(exc))
@@ -141,6 +144,9 @@ def _run_job(job_id: str, repo_url: str) -> None:
         jobs.update_job(job_id, status="error", error=str(exc))
     except Exception as exc:  # pragma: no cover - safety net for unexpected failures
         jobs.update_job(job_id, status="error", error=f"Unexpected error: {exc}")
+    finally:
+        durations = timer.finish()
+        logger.info("job %s stage timings (seconds): %s", job_id, durations)
 
 
 @app.post("/jobs", status_code=202, dependencies=[Depends(rate_limit)])

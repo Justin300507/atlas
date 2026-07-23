@@ -5,7 +5,7 @@ from typing import Callable
 
 import networkx as nx
 
-from .cloner import CloneError, InvalidRepoUrlError, clone_with_history, shallow_clone
+from .cloner import CloneError, InvalidRepoUrlError, clone_with_history
 from .code_parser import FileSymbols, parse_file
 from .doc_generator import generate_documentation
 from .git_intelligence import analyze_git_history
@@ -92,15 +92,21 @@ def run_full_analysis(
 ) -> DocumentationResponse:
     notify = on_stage or _noop_stage
 
+    # A single depth-(N+1) clone checks out the exact same working tree a
+    # depth-1 shallow_clone would (extra depth only adds history behind HEAD,
+    # not different files), so structure analysis and git-history analysis
+    # can share one clone instead of fetching the same repo twice. Stage
+    # names/order are unchanged so job-progress polling sees no difference.
     notify("cloning_structure")
-    with shallow_clone(repo_url) as repo_path:
+    with clone_with_history(repo_url, depth=_GIT_HISTORY_COMMITS + 1) as repo_path:
         repo_root = repo_path
         stack, files, graph, quality, security = analyze_structure(repo_path, on_stage)
 
-    notify("cloning_history")
-    with clone_with_history(repo_url, depth=_GIT_HISTORY_COMMITS + 1) as history_path:
+        # No separate "cloning_history" stage anymore -- the single clone
+        # above already fetched everything git-history analysis needs, so
+        # there's no distinct clone step left here to report a duration for.
         notify("analyzing_git_history")
-        commits, history_truncated = parse_git_log(history_path, max_commits=_GIT_HISTORY_COMMITS)
+        commits, history_truncated = parse_git_log(repo_path, max_commits=_GIT_HISTORY_COMMITS)
         git_report = analyze_git_history(commits, history_truncated)
 
     notify("generating_documentation")

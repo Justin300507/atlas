@@ -89,7 +89,7 @@ describe("App", () => {
     // The live region's actual text content must change on each stage
     // transition -- an aria-live region only announces real DOM mutations,
     // not a sibling element's className toggling.
-    expect(screen.getByText(/Parsing source files \(step 2 of 7\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Parsing source files \(step 2 of 6\)/)).toBeInTheDocument();
   });
 
   it("renders the report once the job is done", async () => {

@@ -3,12 +3,14 @@ import "./App.css";
 import { createJob, getJob, JobNotFoundError, type JobRecord } from "./api";
 import { MarkdownReport } from "./MarkdownReport";
 
+// The backend clones the repo once (deep enough to cover both structure and
+// git history) and reports that single clone under "cloning_structure" --
+// there's no separate clone-history step to show progress for.
 const STAGES = [
   "cloning_structure",
   "parsing",
   "building_graph",
   "analyzing_quality",
-  "cloning_history",
   "analyzing_git_history",
   "generating_documentation",
 ];
@@ -18,7 +20,6 @@ const STAGE_LABELS: Record<string, string> = {
   parsing: "Parsing source files",
   building_graph: "Building dependency graph",
   analyzing_quality: "Analyzing code quality",
-  cloning_history: "Cloning commit history",
   analyzing_git_history: "Analyzing git history",
   generating_documentation: "Generating documentation",
 };
