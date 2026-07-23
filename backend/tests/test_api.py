@@ -68,7 +68,7 @@ def test_analyze_skips_unparseable_file_and_continues(monkeypatch, tmp_path):
         return real_parse_file(path)
 
     monkeypatch.setattr("app.main.shallow_clone", fake_clone)
-    monkeypatch.setattr("app.main.parse_file", flaky_parse_file)
+    monkeypatch.setattr("app.report_pipeline.parse_file", flaky_parse_file)
 
     resp = client.post("/analyze", json={"repo_url": "https://github.com/example/example"})
     assert resp.status_code == 200

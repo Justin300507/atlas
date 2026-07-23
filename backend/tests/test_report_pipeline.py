@@ -2,9 +2,20 @@ import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 
-from app.report_pipeline import run_full_analysis
+from app.report_pipeline import analyze_structure, run_full_analysis
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def test_analyze_structure_returns_stack_files_graph_and_quality():
+    fixture = FIXTURES / "fastapi_repo"
+
+    stack, files, graph, quality = analyze_structure(fixture)
+
+    assert stack.backend == "FastAPI"
+    assert len(files) > 0
+    assert graph.number_of_nodes() > 0
+    assert quality.overall_score == 100
 
 
 def test_on_stage_called_with_every_stage_in_order(monkeypatch, tmp_path):

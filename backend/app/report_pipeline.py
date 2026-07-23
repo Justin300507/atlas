@@ -3,13 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
+import networkx as nx
+
 from .cloner import CloneError, InvalidRepoUrlError, clone_with_history, shallow_clone
-from .code_parser import parse_file
+from .code_parser import FileSymbols, parse_file
 from .doc_generator import generate_documentation
 from .git_intelligence import analyze_git_history
 from .git_log_parser import parse_git_log
 from .graph_builder import build_graph
-from .models import DocumentationResponse
+from .models import DocumentationResponse, QualityReport, StackReport
 from .quality_engine import analyze_quality
 from .stack_detector import detect
 
@@ -51,6 +53,36 @@ def _noop_stage(_stage: str) -> None:
     pass
 
 
+def analyze_structure(
+    repo_path: Path, on_stage: Callable[[str], None] | None = None
+) -> tuple[StackReport, list[FileSymbols], nx.DiGraph, QualityReport]:
+    """Clone-independent structural analysis: stack detection, parsing, the
+    import graph, and quality scoring. Shared by /analyze and
+    run_full_analysis so the two don't maintain separate copies of the same
+    parse-and-score loop."""
+    notify = on_stage or _noop_stage
+
+    stack = detect(repo_path)
+
+    notify("parsing")
+    files: list[FileSymbols] = []
+    for path in _iter_source_files(repo_path):
+        try:
+            symbols = parse_file(path)
+        except Exception:
+            continue
+        if symbols is not None:
+            files.append(symbols)
+
+    notify("building_graph")
+    graph = build_graph(files, repo_root=repo_path)
+
+    notify("analyzing_quality")
+    quality = analyze_quality(files, graph, repo_root=repo_path)
+
+    return stack, files, graph, quality
+
+
 def run_full_analysis(
     repo_url: str, on_stage: Callable[[str], None] | None = None
 ) -> DocumentationResponse:
@@ -59,23 +91,7 @@ def run_full_analysis(
     notify("cloning_structure")
     with shallow_clone(repo_url) as repo_path:
         repo_root = repo_path
-        stack = detect(repo_path)
-
-        notify("parsing")
-        files = []
-        for path in _iter_source_files(repo_path):
-            try:
-                symbols = parse_file(path)
-            except Exception:
-                continue
-            if symbols is not None:
-                files.append(symbols)
-
-        notify("building_graph")
-        graph = build_graph(files, repo_root=repo_path)
-
-        notify("analyzing_quality")
-        quality = analyze_quality(files, graph, repo_root=repo_path)
+        stack, files, graph, quality = analyze_structure(repo_path, on_stage)
 
     notify("cloning_history")
     with clone_with_history(repo_url, depth=_GIT_HISTORY_COMMITS + 1) as history_path:
