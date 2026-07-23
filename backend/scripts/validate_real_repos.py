@@ -28,7 +28,7 @@ from app.cloner import clone_with_history
 from app.doc_generator import generate_documentation
 from app.git_intelligence import analyze_git_history
 from app.git_log_parser import parse_git_log
-from app.report_pipeline import _MAX_FILES_PER_REPO, analyze_structure
+from app.report_pipeline import analyze_structure
 
 REPOS = [
     ("django/django", "https://github.com/django/django", "Python"),
@@ -72,18 +72,23 @@ def validate_one(name: str, url: str, ecosystem: str) -> Result:
     start = time.monotonic()
     try:
         with clone_with_history(url, depth=501) as repo_path:
-            stack, files, graph, quality, security = analyze_structure(repo_path)
+            stack, files, graph, quality, security, coverage = analyze_structure(repo_path)
             commits, history_truncated = parse_git_log(repo_path, max_commits=500)
             git_report = analyze_git_history(commits, history_truncated)
             markdown = generate_documentation(
-                repo_path, stack, files, graph, quality, security, git_report
+                repo_path, stack, files, graph, quality, security, git_report, coverage
             )
             rss = _PROCESS.memory_info().rss
             if rss > peak:
                 peak = rss
 
         r.files_parsed = len(files)
-        r.files_at_cap = len(files) >= _MAX_FILES_PER_REPO
+        # coverage.files_capped is the real signal -- len(files) >= cap would
+        # under-report: the walk can hit the cap at 5,000 *candidates* while
+        # only some of those successfully parse (READMEs/configs/etc return
+        # None from parse_file and never reach `files`), so len(files) can
+        # sit well under the cap even when the walk was truncated.
+        r.files_at_cap = coverage.files_capped
         r.graph_nodes = graph.number_of_nodes()
         r.graph_edges = graph.number_of_edges()
         r.import_edges = sum(

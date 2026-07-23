@@ -5,7 +5,7 @@ from pathlib import Path, PurePath
 import networkx as nx
 
 from .code_parser import FileSymbols
-from .models import GitIntelligenceReport, QualityReport, SecurityReport, StackReport
+from .models import FileCoverage, GitIntelligenceReport, QualityReport, SecurityReport, StackReport
 
 _DIAGRAM_NODE_CAP = 40
 _HIGH_CHURN_LIMIT = 10
@@ -22,9 +22,10 @@ def generate_documentation(
     quality: QualityReport,
     security: SecurityReport,
     git_report: GitIntelligenceReport,
+    coverage: FileCoverage | None = None,
 ) -> str:
     sections = [
-        _executive_summary(stack, files, quality, git_report),
+        _executive_summary(stack, files, quality, git_report, coverage),
         _architecture_overview(graph),
         _directory_guide(repo_root, files),
         _api_reference(repo_root, files),
@@ -45,7 +46,11 @@ def _relative(repo_root: Path, path: str) -> str:
 
 
 def _executive_summary(
-    stack: StackReport, files: list[FileSymbols], quality: QualityReport, git_report: GitIntelligenceReport
+    stack: StackReport,
+    files: list[FileSymbols],
+    quality: QualityReport,
+    git_report: GitIntelligenceReport,
+    coverage: FileCoverage | None = None,
 ) -> str:
     lines = ["## Executive Summary", ""]
     for label, value in [
@@ -57,7 +62,7 @@ def _executive_summary(
         ("Architecture", stack.architecture),
     ]:
         lines.append(f"- {label}: {value or 'Not detected'}")
-    lines.append(f"- Files analyzed: {len(files)}")
+    lines.append(f"- Files analyzed: {len(files)}{_coverage_note(coverage)}")
     lines.append(
         f"- Overall quality score: {quality.overall_score}/100 "
         f"(maintainability {quality.maintainability_score}, architecture {quality.architecture_score})"
@@ -65,6 +70,19 @@ def _executive_summary(
     truncation_note = " (history truncated)" if git_report.history_truncated else ""
     lines.append(f"- Commits analyzed: {git_report.commits_analyzed}{truncation_note}")
     return "\n".join(lines)
+
+
+def _coverage_note(coverage: FileCoverage | None) -> str:
+    if coverage is None:
+        return ""
+    notes = []
+    if coverage.files_capped:
+        notes.append("repository truncated at the file-count cap")
+    if coverage.files_skipped_oversized:
+        notes.append(f"{coverage.files_skipped_oversized} skipped for exceeding the size limit")
+    if coverage.files_parse_failed:
+        notes.append(f"{coverage.files_parse_failed} failed to parse")
+    return f" ({'; '.join(notes)})" if notes else ""
 
 
 def _architecture_overview(graph: nx.DiGraph) -> str:

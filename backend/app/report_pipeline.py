@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -11,7 +12,13 @@ from .doc_generator import generate_documentation
 from .git_intelligence import analyze_git_history
 from .git_log_parser import parse_git_log
 from .graph_builder import build_graph
-from .models import DocumentationResponse, QualityReport, SecurityReport, StackReport
+from .models import (
+    DocumentationResponse,
+    FileCoverage,
+    QualityReport,
+    SecurityReport,
+    StackReport,
+)
 from .quality_engine import analyze_quality
 from .security_scanner import scan_files
 from .stack_detector import detect
@@ -32,10 +39,24 @@ _MAX_FILES_PER_REPO = 5000  # stop walking a repo after yielding this many files
 _GIT_HISTORY_COMMITS = 500
 
 
-def _iter_source_files(repo_path: Path):
-    count = 0
+@dataclass
+class _FileWalkStats:
+    """Tracks what the file walk actually did, so a truncated or partial
+    analysis can be surfaced honestly instead of silently discarded -- found
+    missing during real-world validation (2026-07-24): the file-count cap
+    below has existed since Phase 2 with no way for a caller to tell whether
+    it was ever hit."""
+
+    files_walked: int = 0
+    files_capped: bool = False
+    files_skipped_oversized: int = 0
+    files_parse_failed: int = 0
+
+
+def _iter_source_files(repo_path: Path, stats: _FileWalkStats):
     for path in repo_path.rglob("*"):
-        if count >= _MAX_FILES_PER_REPO:
+        if stats.files_walked >= _MAX_FILES_PER_REPO:
+            stats.files_capped = True
             return
         if not path.is_file():
             continue
@@ -43,10 +64,11 @@ def _iter_source_files(repo_path: Path):
             continue
         try:
             if path.stat().st_size > _MAX_FILE_SIZE_BYTES:
+                stats.files_skipped_oversized += 1
                 continue
         except OSError:
             continue
-        count += 1
+        stats.files_walked += 1
         yield path
 
 
@@ -56,7 +78,7 @@ def _noop_stage(_stage: str) -> None:
 
 def analyze_structure(
     repo_path: Path, on_stage: Callable[[str], None] | None = None
-) -> tuple[StackReport, list[FileSymbols], nx.DiGraph, QualityReport, SecurityReport]:
+) -> tuple[StackReport, list[FileSymbols], nx.DiGraph, QualityReport, SecurityReport, FileCoverage]:
     """Clone-independent structural analysis: stack detection, parsing, the
     import graph, quality scoring, and security scanning. Shared by /analyze
     and run_full_analysis so the two don't maintain separate copies of the
@@ -66,11 +88,13 @@ def analyze_structure(
     stack = detect(repo_path)
 
     notify("parsing")
+    stats = _FileWalkStats()
     files: list[FileSymbols] = []
-    for path in _iter_source_files(repo_path):
+    for path in _iter_source_files(repo_path, stats):
         try:
             symbols = parse_file(path)
         except Exception:
+            stats.files_parse_failed += 1
             continue
         if symbols is not None:
             files.append(symbols)
@@ -84,7 +108,14 @@ def analyze_structure(
     notify("scanning_security")
     security = scan_files(files)
 
-    return stack, files, graph, quality, security
+    coverage = FileCoverage(
+        files_analyzed=len(files),
+        files_capped=stats.files_capped,
+        files_skipped_oversized=stats.files_skipped_oversized,
+        files_parse_failed=stats.files_parse_failed,
+    )
+
+    return stack, files, graph, quality, security, coverage
 
 
 def run_full_analysis(
@@ -100,7 +131,7 @@ def run_full_analysis(
     notify("cloning_structure")
     with clone_with_history(repo_url, depth=_GIT_HISTORY_COMMITS + 1) as repo_path:
         repo_root = repo_path
-        stack, files, graph, quality, security = analyze_structure(repo_path, on_stage)
+        stack, files, graph, quality, security, coverage = analyze_structure(repo_path, on_stage)
 
         # No separate "cloning_history" stage anymore -- the single clone
         # above already fetched everything git-history analysis needs, so
@@ -110,5 +141,7 @@ def run_full_analysis(
         git_report = analyze_git_history(commits, history_truncated)
 
     notify("generating_documentation")
-    markdown = generate_documentation(repo_root, stack, files, graph, quality, security, git_report)
+    markdown = generate_documentation(
+        repo_root, stack, files, graph, quality, security, git_report, coverage
+    )
     return DocumentationResponse(markdown=markdown)

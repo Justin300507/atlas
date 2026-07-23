@@ -3,6 +3,13 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class FileCoverage(BaseModel):
+    files_analyzed: int
+    files_capped: bool
+    files_skipped_oversized: int
+    files_parse_failed: int
+
+
 class StackReport(BaseModel):
     backend: str | None = None
     frontend: str | None = None
@@ -64,6 +71,7 @@ class AnalyzeResponse(BaseModel):
     graph: GraphResponse
     quality: QualityReport
     security: SecurityReport
+    coverage: FileCoverage
 
 
 class FileChurn(BaseModel):

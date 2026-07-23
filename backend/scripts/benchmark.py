@@ -112,13 +112,13 @@ def benchmark_synthetic(target_loc: int) -> Measurement:
             start = time.monotonic()
             try:
                 with _time_stage(m.durations, "parsing_and_graph_and_quality_and_security"):
-                    stack, files, graph, quality, security = analyze_structure(repo_path)
+                    stack, files, graph, quality, security, coverage = analyze_structure(repo_path)
                 with _time_stage(m.durations, "git_history"):
                     commits, truncated = parse_git_log(repo_path, max_commits=500)
                     git_report = analyze_git_history(commits, truncated)
                 with _time_stage(m.durations, "generating_documentation"):
                     generate_documentation(
-                        repo_path, stack, files, graph, quality, security, git_report
+                        repo_path, stack, files, graph, quality, security, git_report, coverage
                     )
             except Exception as exc:  # pragma: no cover - benchmark script
                 m.error = str(exc)

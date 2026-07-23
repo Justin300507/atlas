@@ -6,6 +6,7 @@ from app.code_parser import FileSymbols
 from app.doc_generator import generate_documentation
 from app.models import (
     FileChurn,
+    FileCoverage,
     GitIntelligenceReport,
     QualityIssue,
     QualityReport,
@@ -48,6 +49,41 @@ def test_executive_summary_reports_stack_and_scores():
     assert "PostgreSQL" in doc
     assert "Files analyzed: 1" in doc
     assert "100" in doc
+
+
+def test_executive_summary_omits_coverage_note_when_not_capped():
+    files = [_file("app/main.py")]
+    graph = nx.DiGraph()
+    graph.add_node(str(REPO_ROOT / "app/main.py"), type="module")
+    coverage = FileCoverage(
+        files_analyzed=1, files_capped=False, files_skipped_oversized=0, files_parse_failed=0
+    )
+
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), files, graph, _empty_quality(), _empty_security(), _empty_git(), coverage
+    )
+
+    assert "Files analyzed: 1\n" in doc
+
+
+def test_executive_summary_surfaces_truncation_when_file_cap_hit():
+    # Regression test for the silent-truncation gap found during real-world
+    # validation (2026-07-24): a capped analysis must say so in the report
+    # itself, not just in an internal field nobody reads.
+    files = [_file("app/main.py")]
+    graph = nx.DiGraph()
+    graph.add_node(str(REPO_ROOT / "app/main.py"), type="module")
+    coverage = FileCoverage(
+        files_analyzed=5000, files_capped=True, files_skipped_oversized=12, files_parse_failed=3
+    )
+
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), files, graph, _empty_quality(), _empty_security(), _empty_git(), coverage
+    )
+
+    assert "repository truncated at the file-count cap" in doc
+    assert "12 skipped for exceeding the size limit" in doc
+    assert "3 failed to parse" in doc
 
 
 def test_api_reference_lists_routes_with_relative_paths():

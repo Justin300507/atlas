@@ -4,6 +4,7 @@ from app.models import (
     CoChangePair,
     DocumentationResponse,
     FileChurn,
+    FileCoverage,
     FileOwnership,
     GitIntelligenceReport,
     GraphEdge,
@@ -64,8 +65,22 @@ def test_analyze_response_requires_quality():
         graph=GraphResponse(nodes=[], edges=[]),
         quality=QualityReport(overall_score=100, maintainability_score=100, architecture_score=100, issues=[]),
         security=SecurityReport(issues=[]),
+        coverage=FileCoverage(
+            files_analyzed=1, files_capped=False, files_skipped_oversized=0, files_parse_failed=0
+        ),
     )
     assert response.quality.overall_score == 100
+
+
+def test_file_coverage_reports_walk_outcome():
+    coverage = FileCoverage(
+        files_analyzed=5000,
+        files_capped=True,
+        files_skipped_oversized=3,
+        files_parse_failed=1,
+    )
+    assert coverage.files_capped is True
+    assert coverage.files_skipped_oversized == 3
 
 
 def test_security_report_serializes_issues():
