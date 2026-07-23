@@ -1,4 +1,17 @@
-from app.models import AnalyzeRequest, AnalyzeResponse, GraphEdge, GraphNode, GraphResponse, QualityIssue, QualityReport, StackReport
+from app.models import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    CoChangePair,
+    FileChurn,
+    FileOwnership,
+    GitIntelligenceReport,
+    GraphEdge,
+    GraphNode,
+    GraphResponse,
+    QualityIssue,
+    QualityReport,
+    StackReport,
+)
 
 
 def test_stack_report_defaults_to_none():
@@ -49,3 +62,25 @@ def test_analyze_response_requires_quality():
         quality=QualityReport(overall_score=100, maintainability_score=100, architecture_score=100, issues=[]),
     )
     assert response.quality.overall_score == 100
+
+
+def test_git_intelligence_report_serializes():
+    report = GitIntelligenceReport(
+        commits_analyzed=3,
+        history_truncated=False,
+        churn=[FileChurn(file="a.py", commit_count=2, bug_fix_count=1)],
+        ownership=[
+            FileOwnership(
+                file="a.py",
+                top_author="alice@example.com",
+                top_author_commits=1,
+                total_commits=2,
+                ownership_ratio=0.5,
+            )
+        ],
+        co_changes=[CoChangePair(file_a="a.py", file_b="b.py", co_change_count=1)],
+    )
+    data = report.model_dump()
+    assert data["commits_analyzed"] == 3
+    assert data["churn"][0]["bug_fix_count"] == 1
+    assert data["co_changes"][0]["co_change_count"] == 1

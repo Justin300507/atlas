@@ -51,3 +51,31 @@ class AnalyzeResponse(BaseModel):
     stack: StackReport
     graph: GraphResponse
     quality: QualityReport
+
+
+class FileChurn(BaseModel):
+    file: str
+    commit_count: int
+    bug_fix_count: int
+
+
+class FileOwnership(BaseModel):
+    file: str
+    top_author: str
+    top_author_commits: int
+    total_commits: int
+    ownership_ratio: float
+
+
+class CoChangePair(BaseModel):
+    file_a: str
+    file_b: str
+    co_change_count: int
+
+
+class GitIntelligenceReport(BaseModel):
+    commits_analyzed: int
+    history_truncated: bool
+    churn: list[FileChurn]
+    ownership: list[FileOwnership]
+    co_changes: list[CoChangePair]
