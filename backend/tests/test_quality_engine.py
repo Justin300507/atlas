@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import networkx as nx
 
 from app.code_parser import FileSymbols, FunctionInfo
@@ -87,6 +89,31 @@ def test_large_circular_dependency_cluster_classified_critical_and_message_cappe
     assert "Circular dependency cluster of 25 modules" in issue.message
     assert "and 5 more" in issue.message
     assert report.architecture_score == 20
+
+
+def test_circular_dependency_message_relativizes_paths_given_repo_root():
+    # Regression test: a real browser-driven validation run against
+    # tiangolo/typer found the cluster message embedding full absolute local
+    # temp-clone paths (e.g. "C:\Users\...\atlas-clone-xyz\typer\core.py")
+    # straight into the user-facing report, since analyze_quality had no
+    # repo_root to relativize with — unlike graph_builder/doc_generator, which
+    # already relativize everywhere they can.
+    repo_root = Path("/repo")
+    a = str(repo_root / "a.py")
+    b = str(repo_root / "b.py")
+    files = [_clean_file(a), _clean_file(b)]
+    graph = nx.DiGraph()
+    graph.add_node(a, type="module")
+    graph.add_node(b, type="module")
+    graph.add_edge(a, b, type="import")
+    graph.add_edge(b, a, type="import")
+
+    report = analyze_quality(files, graph, repo_root=repo_root)
+
+    circular_issue = next(i for i in report.issues if i.kind == "circular_import")
+    assert str(repo_root) not in circular_issue.message
+    assert "a.py" in circular_issue.message
+    assert "b.py" in circular_issue.message
 
 
 def test_long_function_detected_and_penalized():

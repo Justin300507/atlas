@@ -64,7 +64,7 @@ def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
                 if symbols is not None:
                     files.append(symbols)
             graph = build_graph(files, repo_root=repo_path)
-            quality = analyze_quality(files, graph)
+            quality = analyze_quality(files, graph, repo_root=repo_path)
             return AnalyzeResponse(
                 stack=stack,
                 graph=GraphResponse(**to_node_link(graph)),

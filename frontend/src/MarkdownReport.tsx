@@ -7,6 +7,17 @@ mermaid.initialize({ startOnLoad: false });
 
 let mermaidIdCounter = 0;
 
+// mermaid.render() is not safe to call concurrently — two overlapping calls
+// interfere with each other's internal rendering sandbox. React StrictMode
+// deliberately double-invokes effects in development (mount -> cleanup ->
+// mount again), which reliably triggers exactly that overlap and left every
+// diagram permanently blank (verified via a real browser-driven run: the
+// render promise resolved with `cancelled` correctly false, yet the
+// resulting SVG string was empty). Routing every call through one shared
+// queue guarantees no two renders — from StrictMode's double-invoke, or from
+// multiple diagrams on the same page — ever run at the same time.
+let renderQueue: Promise<unknown> = Promise.resolve();
+
 function MermaidBlock({ code }: { code: string }) {
   const [svg, setSvg] = useState<string>("");
   const [failed, setFailed] = useState(false);
@@ -15,8 +26,9 @@ function MermaidBlock({ code }: { code: string }) {
     let cancelled = false;
     mermaidIdCounter += 1;
     const id = `atlas-mermaid-${mermaidIdCounter}`;
-    mermaid
-      .render(id, code)
+    const task = renderQueue.then(() => mermaid.render(id, code));
+    renderQueue = task.catch(() => undefined);
+    task
       .then((result) => {
         if (!cancelled) setSvg(result.svg);
       })

@@ -75,7 +75,7 @@ def run_full_analysis(
         graph = build_graph(files, repo_root=repo_path)
 
         notify("analyzing_quality")
-        quality = analyze_quality(files, graph)
+        quality = analyze_quality(files, graph, repo_root=repo_path)
 
     notify("cloning_history")
     with clone_with_history(repo_url, depth=_GIT_HISTORY_COMMITS + 1) as history_path:

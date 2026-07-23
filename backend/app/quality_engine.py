@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path, PurePath
 
 import networkx as nx
 
@@ -33,10 +34,12 @@ _JS_FUNCTION_NAME = re.compile(r"^_{0,2}[a-z][a-zA-Z0-9]*$")
 _CLASS_NAME = re.compile(r"^_?[A-Z][a-zA-Z0-9]*$")
 
 
-def analyze_quality(files: list[FileSymbols], graph: nx.DiGraph) -> QualityReport:
+def analyze_quality(
+    files: list[FileSymbols], graph: nx.DiGraph, repo_root: Path | None = None
+) -> QualityReport:
     issues: list[QualityIssue] = []
 
-    architecture_score, cluster_issues = _score_circular_dependencies(graph)
+    architecture_score, cluster_issues = _score_circular_dependencies(graph, repo_root)
     issues.extend(cluster_issues)
 
     maintainability_score = 100
@@ -119,7 +122,18 @@ def _cluster_severity(size: int) -> str:
     return "minor"
 
 
-def _score_circular_dependencies(graph: nx.DiGraph) -> tuple[int, list[QualityIssue]]:
+def _relative(repo_root: Path | None, path: str) -> str:
+    if repo_root is not None:
+        try:
+            return PurePath(Path(path).relative_to(repo_root)).as_posix()
+        except ValueError:
+            pass
+    return PurePath(path).as_posix()
+
+
+def _score_circular_dependencies(
+    graph: nx.DiGraph, repo_root: Path | None
+) -> tuple[int, list[QualityIssue]]:
     clusters = _find_circular_dependency_clusters(graph)
     if not clusters:
         return 100, []
@@ -135,13 +149,21 @@ def _score_circular_dependencies(graph: nx.DiGraph) -> tuple[int, list[QualityIs
     score -= round(participation_ratio * _PARTICIPATION_PENALTY_SCALE)
     score = max(0, score)
 
-    issues = [_cluster_issue(cluster) for cluster in clusters]
+    issues = [_cluster_issue(cluster, repo_root) for cluster in clusters]
     return score, issues
 
 
-def _cluster_issue(cluster: list[str]) -> QualityIssue:
-    shown = cluster[:_CLUSTER_FILES_SHOWN]
-    remainder = len(cluster) - len(shown)
+def _cluster_issue(cluster: list[str], repo_root: Path | None) -> QualityIssue:
+    # `file=cluster[0]` stays as the raw graph node id (an absolute path) —
+    # doc_generator._risk_areas already relativizes QualityIssue.file itself.
+    # This function additionally relativizes the *listing embedded in the
+    # message text*, since that's free-form text no downstream consumer can
+    # retroactively relativize — leaving it absolute leaked local temp-clone
+    # directory paths straight into the user-facing report (caught via a real
+    # browser-driven validation run against tiangolo/typer).
+    relative_names = [_relative(repo_root, module) for module in cluster]
+    shown = relative_names[:_CLUSTER_FILES_SHOWN]
+    remainder = len(relative_names) - len(shown)
     listing = ", ".join(shown)
     if remainder > 0:
         listing += f", and {remainder} more"
