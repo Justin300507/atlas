@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import "./App.css";
 import { createJob, getJob, type JobRecord } from "./api";
+import { MarkdownReport } from "./MarkdownReport";
 
 const STAGES = [
   "cloning_structure",
@@ -122,7 +123,7 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
       {view === "done" && job?.markdown && (
         <div className="report">
           <button onClick={reset}>New Analysis</button>
-          <pre>{job.markdown}</pre>
+          <MarkdownReport markdown={job.markdown} />
         </div>
       )}
 
