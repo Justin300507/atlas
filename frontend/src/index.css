@@ -50,7 +50,6 @@
   width: 1126px;
   max-width: 100%;
   margin: 0 auto;
-  text-align: center;
   border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
@@ -62,14 +61,14 @@ body {
   margin: 0;
 }
 
-h1,
-h2 {
+/* Only the hero title is centered -- report content (lists, tables,
+   paragraphs) needs to read left-to-right like any normal document, not
+   have every wrapped line re-centered independently. */
+h1 {
+  text-align: center;
   font-family: var(--heading);
   font-weight: 500;
   color: var(--text-h);
-}
-
-h1 {
   font-size: 56px;
   letter-spacing: -1.68px;
   margin: 32px 0;
@@ -79,6 +78,9 @@ h1 {
   }
 }
 h2 {
+  font-family: var(--heading);
+  font-weight: 500;
+  color: var(--text-h);
   font-size: 24px;
   line-height: 118%;
   letter-spacing: -0.24px;
@@ -96,9 +98,6 @@ code {
   display: inline-flex;
   border-radius: 4px;
   color: var(--text-h);
-}
-
-code {
   font-size: 15px;
   line-height: 135%;
   padding: 4px 8px;

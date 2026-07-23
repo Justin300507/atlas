@@ -84,7 +84,7 @@ describe("App", () => {
     fireEvent.click(screen.getByText("Analyze"));
 
     await waitFor(() => {
-      expect(screen.getByText("Parsing source files")).toHaveClass("done");
+      expect(screen.getByText("Parsing source files")).toHaveClass("current");
     });
     // The live region's actual text content must change on each stage
     // transition -- an aria-live region only announces real DOM mutations,
@@ -117,7 +117,7 @@ describe("App", () => {
     fireEvent.click(screen.getByText("Analyze"));
 
     await waitFor(() => {
-      expect(screen.getByText("Scanning for security issues")).toHaveClass("done");
+      expect(screen.getByText("Scanning for security issues")).toHaveClass("current");
     });
     expect(screen.getByText("Analyzing code quality")).toHaveClass("done");
     expect(screen.getByText("Cloning repository")).toHaveClass("done");
@@ -239,7 +239,7 @@ describe("App", () => {
     render(<App pollIntervalMs={5} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Parsing source files")).toHaveClass("done");
+      expect(screen.getByText("Parsing source files")).toHaveClass("current");
     });
     expect(fetchMock.mock.calls[0][0]).toContain("/jobs/abc123");
   });
@@ -312,7 +312,7 @@ describe("App", () => {
     expect(JSON.parse(localStorage.getItem("atlas.activeJob")!).jobId).toBe("abc123");
 
     await waitFor(() => {
-      expect(screen.getByText("Parsing source files")).toHaveClass("done");
+      expect(screen.getByText("Parsing source files")).toHaveClass("current");
     });
   });
 

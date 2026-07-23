@@ -3,6 +3,18 @@
   margin: 0 auto;
   padding: 2rem 1rem;
   font-family: system-ui, sans-serif;
+  text-align: center;
+}
+
+.report {
+  text-align: left;
+}
+
+.tagline {
+  color: var(--text);
+  max-width: 46ch;
+  margin: 0 auto 1.25rem;
+  line-height: 1.5;
 }
 
 form {
@@ -26,6 +38,18 @@ button {
   color: #b00020;
 }
 
+@media (prefers-color-scheme: dark) {
+  .error {
+    color: #ff6b6b;
+  }
+}
+:root[data-theme="dark"] .error {
+  color: #ff6b6b;
+}
+:root[data-theme="light"] .error {
+  color: #b00020;
+}
+
 .progress ul {
   list-style: none;
   padding: 0;
@@ -33,11 +57,16 @@ button {
 
 .progress li {
   padding: 0.25rem 0;
-  color: #888;
+  color: var(--text);
 }
 
 .progress li.done {
-  color: #111;
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.progress li.current {
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -46,8 +75,43 @@ button {
   word-wrap: break-word;
 }
 
+/* react-markdown emits plain <p>/<ul>/<h2> with no spacing of their own
+   (index.css zeroes out p/h2 margins for the hero title), so a report's
+   sections run together with no visual separation without this. */
+.report h2 {
+  margin-top: 1.75rem;
+}
+.report h2:first-child {
+  margin-top: 0;
+}
+.report p,
+.report ul {
+  margin: 0.4rem 0;
+}
+.report li {
+  margin-bottom: 0.15rem;
+}
+
 .table-scroll {
   overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+.report table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.report th,
+.report td {
+  text-align: left;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+}
+
+.report th {
+  background: var(--code-bg);
+  font-weight: 600;
 }
 
 .sr-only {

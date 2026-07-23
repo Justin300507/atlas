@@ -191,27 +191,33 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
       <h1>Atlas</h1>
 
       {view === "idle" && (
-        <form onSubmit={handleSubmit}>
-          <label htmlFor="repo-url" className="sr-only">
-            GitHub repository URL
-          </label>
-          <input
-            id="repo-url"
-            type="text"
-            placeholder="https://github.com/owner/repo"
-            value={repoUrl}
-            onChange={(e) => setRepoUrl(e.target.value)}
-            required
-          />
-          <button type="submit" disabled={submitting}>
-            {submitting ? "Starting…" : "Analyze"}
-          </button>
-          {submitError && (
-            <p className="error" role="alert">
-              {submitError}
-            </p>
-          )}
-        </form>
+        <>
+          <p className="tagline">
+            Paste a public GitHub repo and get a full engineering review — stack, architecture,
+            code quality, security, and git history — in one report.
+          </p>
+          <form onSubmit={handleSubmit}>
+            <label htmlFor="repo-url" className="sr-only">
+              GitHub repository URL
+            </label>
+            <input
+              id="repo-url"
+              type="text"
+              placeholder="https://github.com/owner/repo"
+              value={repoUrl}
+              onChange={(e) => setRepoUrl(e.target.value)}
+              required
+            />
+            <button type="submit" disabled={submitting}>
+              {submitting ? "Starting…" : "Analyze"}
+            </button>
+            {submitError && (
+              <p className="error" role="alert">
+                {submitError}
+              </p>
+            )}
+          </form>
+        </>
       )}
 
       {view === "running" && (
@@ -227,7 +233,10 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
           </p>
           <ul>
             {STAGES.map((stage, i) => (
-              <li key={stage} className={i <= currentStageIndex ? "done" : ""}>
+              <li
+                key={stage}
+                className={i < currentStageIndex ? "done" : i === currentStageIndex ? "current" : ""}
+              >
                 {STAGE_LABELS[stage]}
               </li>
             ))}
