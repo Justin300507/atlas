@@ -1,4 +1,4 @@
-# Atlas Backend (Phase 1: Repository Intelligence)
+# Atlas Backend
 
 ## Setup
 
@@ -40,6 +40,22 @@ repo has more history than was analyzed), and three deterministic rollups: `chur
 (commit count and bug-fix-commit count per file, top 20), `ownership` (top author and
 ownership ratio per file, top 20), and `co_changes` (file pairs that change together
 in the same commit, top 20).
+
+## Documentation Generator
+
+```bash
+curl -X POST http://127.0.0.1:8000/documentation \
+  -H "Content-Type: application/json" \
+  -d "{\"repo_url\": \"https://github.com/octocat/Hello-World\"}"
+```
+
+Runs the `/analyze` pipeline and the `/git-intelligence` pipeline internally (two
+clones, same as calling both endpoints separately) and assembles the results into a
+single Markdown report in the response's `markdown` field: Executive Summary,
+Architecture Overview, Directory Guide, API Reference, a Mermaid Dependency Diagram
+(capped at 40 modules for readability), Risk Areas (from the quality report), and
+Recent High-Churn Components (from git intelligence). Purely deterministic — no LLM
+call, no data beyond what the other three endpoints already compute.
 
 ## Test
 

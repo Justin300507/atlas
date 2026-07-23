@@ -180,3 +180,42 @@ def test_git_intelligence_returns_expected_shape(tmp_path, monkeypatch):
 def test_git_intelligence_rejects_invalid_url():
     resp = client.post("/git-intelligence", json={"repo_url": "not-a-url"})
     assert resp.status_code == 400
+
+
+def test_documentation_returns_markdown_report(tmp_path, monkeypatch):
+    structure_fixture = FIXTURES / "fastapi_repo"
+
+    history_repo = tmp_path / "history_repo"
+    history_repo.mkdir()
+    subprocess.run(["git", "init"], cwd=history_repo, check=True, capture_output=True)
+    (history_repo / "a.py").write_text("1\n")
+    subprocess.run(["git", "add", "a.py"], cwd=history_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=test@test.com", "-c", "user.name=test", "commit", "-m", "init"],
+        cwd=history_repo,
+        check=True,
+        capture_output=True,
+    )
+
+    @contextmanager
+    def fake_shallow_clone(url, timeout=60):
+        yield structure_fixture
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield history_repo
+
+    monkeypatch.setattr("app.main.shallow_clone", fake_shallow_clone)
+    monkeypatch.setattr("app.main.clone_with_history", fake_clone_with_history)
+
+    resp = client.post("/documentation", json={"repo_url": "https://github.com/example/example"})
+    assert resp.status_code == 200
+    markdown = resp.json()["markdown"]
+    assert "## Executive Summary" in markdown
+    assert "## API Reference" in markdown
+    assert "/users" in markdown
+
+
+def test_documentation_rejects_invalid_url():
+    resp = client.post("/documentation", json={"repo_url": "not-a-url"})
+    assert resp.status_code == 400
