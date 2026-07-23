@@ -5,11 +5,12 @@ from pathlib import Path, PurePath
 import networkx as nx
 
 from .code_parser import FileSymbols
-from .models import GitIntelligenceReport, QualityReport, StackReport
+from .models import GitIntelligenceReport, QualityReport, SecurityReport, StackReport
 
 _DIAGRAM_NODE_CAP = 40
 _HIGH_CHURN_LIMIT = 10
 _RISK_AREAS_LIMIT = 20
+_SECURITY_FINDINGS_LIMIT = 20
 _SEVERITY_ORDER = {"critical": 0, "important": 1, "minor": 2}
 
 
@@ -19,6 +20,7 @@ def generate_documentation(
     files: list[FileSymbols],
     graph: nx.DiGraph,
     quality: QualityReport,
+    security: SecurityReport,
     git_report: GitIntelligenceReport,
 ) -> str:
     sections = [
@@ -28,6 +30,7 @@ def generate_documentation(
         _api_reference(repo_root, files),
         _dependency_diagram(graph),
         _risk_areas(repo_root, quality),
+        _security_findings(repo_root, security),
         _high_churn_components(git_report),
         _analysis_coverage(),
     ]
@@ -187,6 +190,25 @@ def _risk_areas(repo_root: Path, quality: QualityReport) -> str:
     return "\n".join(lines)
 
 
+def _security_findings(repo_root: Path, security: SecurityReport) -> str:
+    lines = ["## Security Findings", ""]
+    if not security.issues:
+        lines.append("No issues detected.")
+        return "\n".join(lines)
+
+    ordered = sorted(security.issues, key=lambda i: _SEVERITY_ORDER.get(i.severity, 99))
+    shown = ordered[:_SECURITY_FINDINGS_LIMIT]
+    for issue in shown:
+        rel = _relative(repo_root, issue.file)
+        lines.append(f"- **{issue.severity}** `{rel}:{issue.line}` {issue.kind}: {issue.message}")
+
+    remainder = len(ordered) - len(shown)
+    if remainder > 0:
+        lines.append("")
+        lines.append(f"_...and {remainder} additional findings._")
+    return "\n".join(lines)
+
+
 def _high_churn_components(git_report: GitIntelligenceReport) -> str:
     lines = ["## Recent High-Churn Components", ""]
     top = git_report.churn[:_HIGH_CHURN_LIMIT]
@@ -224,10 +246,14 @@ def _analysis_coverage() -> str:
             "- Dynamic ES imports (JS/TS `import(...)` expressions)",
             "- Git history (commit churn, ownership, co-change)",
             "- Repository structure and stack detection",
+            "- Security scanning for hardcoded secrets, dangerous shell/eval "
+            "execution, and unsafe deserialization",
             "",
             "**Limitations:**",
             "- Imports whose target isn't a string literal (e.g. "
             "`require(somePathVariable)`) can't be resolved statically and are skipped.",
+            "- Security scanning is pattern-based (not full static analysis) and "
+            "can miss real issues or flag safe code that matches a risky pattern.",
             "- Quality and architecture scores are heuristic engineering signals, "
             "not guarantees of correctness or safety.",
         ]

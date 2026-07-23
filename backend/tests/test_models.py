@@ -11,6 +11,8 @@ from app.models import (
     GraphResponse,
     QualityIssue,
     QualityReport,
+    SecurityIssue,
+    SecurityReport,
     StackReport,
 )
 
@@ -61,8 +63,25 @@ def test_analyze_response_requires_quality():
         stack=StackReport(),
         graph=GraphResponse(nodes=[], edges=[]),
         quality=QualityReport(overall_score=100, maintainability_score=100, architecture_score=100, issues=[]),
+        security=SecurityReport(issues=[]),
     )
     assert response.quality.overall_score == 100
+
+
+def test_security_report_serializes_issues():
+    report = SecurityReport(
+        issues=[
+            SecurityIssue(
+                file="app/config.py",
+                line=5,
+                kind="hardcoded_secret",
+                message="Hardcoded AWS access key detected",
+                severity="critical",
+            )
+        ]
+    )
+    data = report.model_dump()
+    assert data["issues"][0]["kind"] == "hardcoded_secret"
 
 
 def test_git_intelligence_report_serializes():

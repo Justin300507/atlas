@@ -43,6 +43,18 @@ class QualityReport(BaseModel):
     issues: list[QualityIssue]
 
 
+class SecurityIssue(BaseModel):
+    file: str
+    line: int
+    kind: str
+    message: str
+    severity: str
+
+
+class SecurityReport(BaseModel):
+    issues: list[SecurityIssue]
+
+
 class AnalyzeRequest(BaseModel):
     repo_url: str
 
@@ -51,6 +63,7 @@ class AnalyzeResponse(BaseModel):
     stack: StackReport
     graph: GraphResponse
     quality: QualityReport
+    security: SecurityReport
 
 
 class FileChurn(BaseModel):

@@ -11,8 +11,9 @@ from .doc_generator import generate_documentation
 from .git_intelligence import analyze_git_history
 from .git_log_parser import parse_git_log
 from .graph_builder import build_graph
-from .models import DocumentationResponse, QualityReport, StackReport
+from .models import DocumentationResponse, QualityReport, SecurityReport, StackReport
 from .quality_engine import analyze_quality
+from .security_scanner import scan_files
 from .stack_detector import detect
 
 # Bounds on parsing arbitrary cloned repos: this pipeline clones and parses
@@ -55,11 +56,11 @@ def _noop_stage(_stage: str) -> None:
 
 def analyze_structure(
     repo_path: Path, on_stage: Callable[[str], None] | None = None
-) -> tuple[StackReport, list[FileSymbols], nx.DiGraph, QualityReport]:
+) -> tuple[StackReport, list[FileSymbols], nx.DiGraph, QualityReport, SecurityReport]:
     """Clone-independent structural analysis: stack detection, parsing, the
-    import graph, and quality scoring. Shared by /analyze and
-    run_full_analysis so the two don't maintain separate copies of the same
-    parse-and-score loop."""
+    import graph, quality scoring, and security scanning. Shared by /analyze
+    and run_full_analysis so the two don't maintain separate copies of the
+    same parse-and-score loop."""
     notify = on_stage or _noop_stage
 
     stack = detect(repo_path)
@@ -80,7 +81,10 @@ def analyze_structure(
     notify("analyzing_quality")
     quality = analyze_quality(files, graph, repo_root=repo_path)
 
-    return stack, files, graph, quality
+    notify("scanning_security")
+    security = scan_files(files)
+
+    return stack, files, graph, quality, security
 
 
 def run_full_analysis(
@@ -91,7 +95,7 @@ def run_full_analysis(
     notify("cloning_structure")
     with shallow_clone(repo_url) as repo_path:
         repo_root = repo_path
-        stack, files, graph, quality = analyze_structure(repo_path, on_stage)
+        stack, files, graph, quality, security = analyze_structure(repo_path, on_stage)
 
     notify("cloning_history")
     with clone_with_history(repo_url, depth=_GIT_HISTORY_COMMITS + 1) as history_path:
@@ -100,5 +104,5 @@ def run_full_analysis(
         git_report = analyze_git_history(commits, history_truncated)
 
     notify("generating_documentation")
-    markdown = generate_documentation(repo_root, stack, files, graph, quality, git_report)
+    markdown = generate_documentation(repo_root, stack, files, graph, quality, security, git_report)
     return DocumentationResponse(markdown=markdown)

@@ -58,11 +58,12 @@ def health() -> dict:
 def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     try:
         with shallow_clone(request.repo_url) as repo_path:
-            stack, _files, graph, quality = analyze_structure(repo_path)
+            stack, _files, graph, quality, security = analyze_structure(repo_path)
             return AnalyzeResponse(
                 stack=stack,
                 graph=GraphResponse(**to_node_link(graph)),
                 quality=quality,
+                security=security,
             )
     except InvalidRepoUrlError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -9,6 +9,8 @@ from app.models import (
     GitIntelligenceReport,
     QualityIssue,
     QualityReport,
+    SecurityIssue,
+    SecurityReport,
     StackReport,
 )
 
@@ -23,6 +25,10 @@ def _empty_quality() -> QualityReport:
     return QualityReport(overall_score=100, maintainability_score=100, architecture_score=100, issues=[])
 
 
+def _empty_security() -> SecurityReport:
+    return SecurityReport(issues=[])
+
+
 def _empty_git() -> GitIntelligenceReport:
     return GitIntelligenceReport(
         commits_analyzed=0, history_truncated=False, churn=[], ownership=[], co_changes=[]
@@ -35,7 +41,7 @@ def test_executive_summary_reports_stack_and_scores():
     graph = nx.DiGraph()
     graph.add_node(str(REPO_ROOT / "app/main.py"), type="module")
 
-    doc = generate_documentation(REPO_ROOT, stack, files, graph, _empty_quality(), _empty_git())
+    doc = generate_documentation(REPO_ROOT, stack, files, graph, _empty_quality(), _empty_security(), _empty_git())
 
     assert "## Executive Summary" in doc
     assert "FastAPI" in doc
@@ -49,7 +55,7 @@ def test_api_reference_lists_routes_with_relative_paths():
     graph = nx.DiGraph()
     graph.add_node(str(REPO_ROOT / "app/main.py"), type="module")
 
-    doc = generate_documentation(REPO_ROOT, StackReport(), files, graph, _empty_quality(), _empty_git())
+    doc = generate_documentation(REPO_ROOT, StackReport(), files, graph, _empty_quality(), _empty_security(), _empty_git())
 
     assert "## API Reference" in doc
     assert "GET" in doc and "/users" in doc
@@ -61,7 +67,7 @@ def test_directory_guide_groups_by_top_level_directory():
     files = [_file("app/main.py"), _file("app/utils.py"), _file("scripts/run.py")]
     graph = nx.DiGraph()
 
-    doc = generate_documentation(REPO_ROOT, StackReport(), files, graph, _empty_quality(), _empty_git())
+    doc = generate_documentation(REPO_ROOT, StackReport(), files, graph, _empty_quality(), _empty_security(), _empty_git())
 
     assert "## Directory Guide" in doc
     assert "app" in doc
@@ -78,7 +84,7 @@ def test_architecture_overview_ranks_most_depended_upon_module():
     graph.add_edge(a, c, type="import")
     graph.add_edge(b, c, type="import")
 
-    doc = generate_documentation(REPO_ROOT, StackReport(), [], graph, _empty_quality(), _empty_git())
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], graph, _empty_quality(), _empty_security(), _empty_git())
 
     assert "## Architecture Overview" in doc
     assert "c.py" in doc
@@ -100,7 +106,7 @@ def test_risk_areas_lists_quality_issues_with_relative_paths():
         ],
     )
 
-    doc = generate_documentation(REPO_ROOT, StackReport(), [], nx.DiGraph(), quality, _empty_git())
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], nx.DiGraph(), quality, _empty_security(), _empty_git())
 
     assert "## Risk Areas" in doc
     assert "long_function" in doc
@@ -120,11 +126,43 @@ def test_risk_areas_caps_at_20_with_overflow_note():
     ]
     quality = QualityReport(overall_score=0, maintainability_score=0, architecture_score=100, issues=issues)
 
-    doc = generate_documentation(REPO_ROOT, StackReport(), [], nx.DiGraph(), quality, _empty_git())
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], nx.DiGraph(), quality, _empty_security(), _empty_git())
 
     section = doc.split("## Risk Areas")[1].split("## ")[0]
     assert section.count("mod_") == 20
     assert "and 5 additional findings" in section
+
+
+def test_security_findings_lists_issues_with_relative_paths():
+    security = SecurityReport(
+        issues=[
+            SecurityIssue(
+                file=str(REPO_ROOT / "app/config.py"),
+                line=5,
+                kind="hardcoded_secret",
+                message="Hardcoded AWS access key detected",
+                severity="critical",
+            )
+        ]
+    )
+
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), security, _empty_git()
+    )
+
+    assert "## Security Findings" in doc
+    assert "hardcoded_secret" in doc
+    assert "app/config.py" in doc
+    assert str(REPO_ROOT) not in doc
+
+
+def test_security_findings_reports_none_detected_when_clean():
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git()
+    )
+
+    section = doc.split("## Security Findings")[1].split("## ")[0]
+    assert "No issues detected." in section
 
 
 def test_high_churn_section_lists_top_files_and_truncation_state():
@@ -136,7 +174,7 @@ def test_high_churn_section_lists_top_files_and_truncation_state():
         co_changes=[],
     )
 
-    doc = generate_documentation(REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), git_report)
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), git_report)
 
     assert "## Recent High-Churn Components" in doc
     assert "app/main.py" in doc
@@ -151,7 +189,7 @@ def test_dependency_diagram_caps_at_40_nodes_with_note():
     for i in range(44):
         graph.add_edge(str(REPO_ROOT / f"mod_{i}.py"), str(REPO_ROOT / f"mod_{i + 1}.py"), type="import")
 
-    doc = generate_documentation(REPO_ROOT, StackReport(), [], graph, _empty_quality(), _empty_git())
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], graph, _empty_quality(), _empty_security(), _empty_git())
 
     assert "## Dependency Diagram" in doc
     assert "```mermaid" in doc
@@ -173,7 +211,7 @@ def test_dependency_diagram_ranks_by_import_degree_not_route_degree():
         graph.add_node(route_id, type="route")
         graph.add_edge(route_heavy, route_id, type="route")
 
-    doc = generate_documentation(REPO_ROOT, StackReport(), [], graph, _empty_quality(), _empty_git())
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], graph, _empty_quality(), _empty_security(), _empty_git())
 
     assert "route_heavy.py" not in doc
     assert "mod_0.py" in doc
@@ -182,7 +220,7 @@ def test_dependency_diagram_ranks_by_import_degree_not_route_degree():
 
 def test_empty_repo_renders_without_crashing():
     doc = generate_documentation(
-        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_git()
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git()
     )
 
     for header in (
@@ -192,6 +230,7 @@ def test_empty_repo_renders_without_crashing():
         "## API Reference",
         "## Dependency Diagram",
         "## Risk Areas",
+        "## Security Findings",
         "## Recent High-Churn Components",
         "## Analysis Coverage",
     ):
@@ -200,7 +239,7 @@ def test_empty_repo_renders_without_crashing():
 
 def test_analysis_coverage_footer_discloses_support_and_limitations():
     doc = generate_documentation(
-        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_git()
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git()
     )
 
     assert "## Analysis Coverage" in doc
@@ -208,5 +247,7 @@ def test_analysis_coverage_footer_discloses_support_and_limitations():
     assert "ES Module" in doc
     assert "CommonJS" in doc
     assert "Git history" in doc
+    assert "Security scanning" in doc
     assert "can't be resolved statically" in doc
+    assert "pattern-based" in doc
     assert "heuristic engineering signals" in doc

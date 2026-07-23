@@ -34,6 +34,8 @@ def test_analyze_returns_stack_and_graph(monkeypatch):
     assert len(body["graph"]["nodes"]) > 0
     assert "quality" in body
     assert "overall_score" in body["quality"]
+    assert "security" in body
+    assert "issues" in body["security"]
 
 
 def test_analyze_returns_422_on_clone_failure(monkeypatch):
@@ -78,6 +80,8 @@ def test_analyze_skips_unparseable_file_and_continues(monkeypatch, tmp_path):
     assert str(bad_file) not in node_ids
     assert "quality" in body
     assert "overall_score" in body["quality"]
+    assert "security" in body
+    assert "issues" in body["security"]
 
 
 def test_analyze_skips_oversized_file_and_keeps_others(monkeypatch, tmp_path):
@@ -102,6 +106,8 @@ def test_analyze_skips_oversized_file_and_keeps_others(monkeypatch, tmp_path):
     assert str(big_file) not in node_ids
     assert "quality" in body
     assert "overall_score" in body["quality"]
+    assert "security" in body
+    assert "issues" in body["security"]
 
 
 def test_analyze_stops_walking_after_max_file_count(monkeypatch, tmp_path):
@@ -123,6 +129,8 @@ def test_analyze_stops_walking_after_max_file_count(monkeypatch, tmp_path):
     assert len(module_nodes) == 2
     assert "quality" in body
     assert "overall_score" in body["quality"]
+    assert "security" in body
+    assert "issues" in body["security"]
 
 
 def test_analyze_quality_report_has_expected_shape(monkeypatch):
@@ -144,6 +152,22 @@ def test_analyze_quality_report_has_expected_shape(monkeypatch):
         "issues",
     }
     assert isinstance(quality["issues"], list)
+
+
+def test_analyze_security_report_has_expected_shape(monkeypatch):
+    fixture = FIXTURES / "fastapi_repo"
+
+    @contextmanager
+    def fake_clone(url, timeout=60):
+        yield fixture
+
+    monkeypatch.setattr("app.main.shallow_clone", fake_clone)
+
+    resp = client.post("/analyze", json={"repo_url": "https://github.com/example/example"})
+    assert resp.status_code == 200
+    security = resp.json()["security"]
+    assert set(security.keys()) == {"issues"}
+    assert isinstance(security["issues"], list)
 
 
 def test_git_intelligence_returns_expected_shape(tmp_path, monkeypatch):
