@@ -30,11 +30,20 @@ def parse_git_log(repo_path: Path, max_commits: int = 500) -> tuple[list[Commit]
             "log",
             f"-n{max_commits + 1}",
             "--numstat",
+            # Force UTF-8 regardless of the repo's commit-encoding config, so
+            # decoding below doesn't depend on it.
+            "--encoding=UTF-8",
             f"--pretty=format:{_COMMIT_MARKER}%H{_FIELD_SEP}%ae{_FIELD_SEP}%s",
         ],
         cwd=repo_path,
         capture_output=True,
-        text=True,
+        # Explicit encoding, not text=True's platform-default codec: on
+        # Windows that defaults to the system codepage (e.g. cp1252), which
+        # raises UnicodeDecodeError on real-world commit messages containing
+        # non-ASCII names or emoji. errors="replace" means a handful of
+        # undecodable bytes degrade a character, not the whole request.
+        encoding="utf-8",
+        errors="replace",
     )
     if result.returncode != 0:
         # A repo with no commits yet is a legitimate degenerate case (e.g. a

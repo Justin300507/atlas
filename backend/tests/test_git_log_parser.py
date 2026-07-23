@@ -78,6 +78,47 @@ def test_parse_git_log_skips_binary_file_numstat_lines(tmp_path):
     assert paths == {"text.py"}
 
 
+def test_parse_git_log_handles_non_ascii_and_emoji_commit_messages(tmp_path):
+    _init_repo(tmp_path)
+    _commit(
+        tmp_path,
+        "fix: café résumé naïve 🎉 emoji test",
+        "author@example.com",
+        {"a.py": "1\n"},
+    )
+
+    commits, _ = parse_git_log(tmp_path, max_commits=500)
+
+    assert len(commits) == 1
+    assert commits[0].message == "fix: café résumé naïve 🎉 emoji test"
+
+
+def test_parse_git_log_handles_non_ascii_author_name_and_email(tmp_path):
+    _init_repo(tmp_path)
+    (tmp_path / "a.py").write_text("1\n")
+    subprocess.run(["git", "add", "a.py"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=josé@example.com",
+            "-c",
+            "user.name=José Müller",
+            "commit",
+            "-m",
+            "init",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    commits, _ = parse_git_log(tmp_path, max_commits=500)
+
+    assert len(commits) == 1
+    assert commits[0].author_email == "josé@example.com"
+
+
 def test_parse_git_log_handles_repo_with_no_commits(tmp_path):
     _init_repo(tmp_path)
 
