@@ -1,6 +1,6 @@
 # Atlas
 
-AI Engineering Intelligence Platform — paste a GitHub repo, get a full engineering
+Software Intelligence Platform — paste a GitHub repo, get a full engineering
 review instead of a chatbot.
 
 Given a public GitHub URL, Atlas clones it and produces:
@@ -17,24 +17,44 @@ Given a public GitHub URL, Atlas clones it and produces:
   above, with a Mermaid dependency diagram.
 
 All deterministic, static analysis — no LLM calls in the pipeline itself.
+See two real generated reports in [`docs/examples/`](docs/examples/) (a
+Python CLI framework and a CommonJS Node.js server).
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Idle screen](docs/screenshots/idle.png) | ![Analysis in progress](docs/screenshots/running.png) |
+| ![Generated report](docs/screenshots/report-light.png) | ![Generated report, dark mode](docs/screenshots/report-dark.png) |
 
 ## Running it
 
 - **Quick start**: `docker compose up --build` — see [`DEPLOYMENT.md`](DEPLOYMENT.md).
-- **Backend only**: see [`backend/README.md`](backend/README.md).
+- **Backend only**: see [`backend/README.md`](backend/README.md). Once running,
+  interactive API docs are at `http://127.0.0.1:8000/docs` (Swagger UI, auto-generated).
 - **Frontend only**: `cd frontend && npm install && npm run dev` (needs the
-  backend running; see `frontend/.env`/`VITE_API_BASE`).
+  backend running; see `VITE_API_BASE` in `DEPLOYMENT.md`).
 
 The frontend is a paste-a-URL flow: submit a repo, watch per-stage progress,
 get back the rendered report. It survives a page refresh mid-analysis.
 
+## Documentation
+
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — module responsibilities, request-flow diagram.
+- [`DEPLOYMENT.md`](DEPLOYMENT.md) — environment variables, Docker, production checklist.
+- [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) — common setup/runtime issues.
+- [`docs/examples/`](docs/examples/) — real generated reports.
+- [`docs/benchmarks/`](docs/benchmarks/) — measured performance across repo sizes.
+- `docs/superpowers/specs/` — a design doc per feature, including explicitly
+  documented known limitations for each.
+
 ## Project layout
 
-- `backend/` — FastAPI app (`app/`), pytest suite (`tests/`).
+- `backend/` — FastAPI app (`app/`), pytest suite (`tests/`), benchmarking
+  scripts (`scripts/`, see `docs/benchmarks/`).
 - `frontend/` — React + Vite + TypeScript.
 - `docs/superpowers/specs/` — design docs, one per phase/feature.
 - `docs/superpowers/plans/` — implementation plans for earlier phases.
-- `DEPLOYMENT.md` — environment variables, docker-compose, production checklist.
 
 ## Not yet built
 
