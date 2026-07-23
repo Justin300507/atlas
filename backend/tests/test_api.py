@@ -1,3 +1,4 @@
+import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -141,3 +142,41 @@ def test_analyze_quality_report_has_expected_shape(monkeypatch):
         "issues",
     }
     assert isinstance(quality["issues"], list)
+
+
+def test_git_intelligence_returns_expected_shape(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    (repo / "a.py").write_text("1\n")
+    subprocess.run(["git", "add", "a.py"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=test@test.com", "-c", "user.name=test", "commit", "-m", "init"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield repo
+
+    monkeypatch.setattr("app.main.clone_with_history", fake_clone_with_history)
+
+    resp = client.post("/git-intelligence", json={"repo_url": "https://github.com/example/example"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body.keys()) == {
+        "commits_analyzed",
+        "history_truncated",
+        "churn",
+        "ownership",
+        "co_changes",
+    }
+    assert body["commits_analyzed"] == 1
+    assert body["churn"][0]["file"] == "a.py"
+
+
+def test_git_intelligence_rejects_invalid_url():
+    resp = client.post("/git-intelligence", json={"repo_url": "not-a-url"})
+    assert resp.status_code == 400

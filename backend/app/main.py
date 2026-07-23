@@ -5,10 +5,12 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 
-from .cloner import CloneError, InvalidRepoUrlError, shallow_clone
+from .cloner import CloneError, InvalidRepoUrlError, clone_with_history, shallow_clone
 from .code_parser import parse_file
+from .git_intelligence import analyze_git_history
+from .git_log_parser import parse_git_log
 from .graph_builder import build_graph, to_node_link
-from .models import AnalyzeRequest, AnalyzeResponse, GraphResponse
+from .models import AnalyzeRequest, AnalyzeResponse, GitIntelligenceReport, GraphResponse
 from .quality_engine import analyze_quality
 from .stack_detector import detect
 
@@ -67,6 +69,20 @@ def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
                 graph=GraphResponse(**to_node_link(graph)),
                 quality=quality,
             )
+    except InvalidRepoUrlError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=504, detail="Repository clone timed out") from exc
+    except CloneError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/git-intelligence", response_model=GitIntelligenceReport)
+def git_intelligence(request: AnalyzeRequest) -> GitIntelligenceReport:
+    try:
+        with clone_with_history(request.repo_url) as repo_path:
+            commits, history_truncated = parse_git_log(repo_path)
+            return analyze_git_history(commits, history_truncated)
     except InvalidRepoUrlError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except subprocess.TimeoutExpired as exc:
