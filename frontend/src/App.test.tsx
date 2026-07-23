@@ -89,7 +89,38 @@ describe("App", () => {
     // The live region's actual text content must change on each stage
     // transition -- an aria-live region only announces real DOM mutations,
     // not a sibling element's className toggling.
-    expect(screen.getByText(/Parsing source files \(step 2 of 6\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Parsing source files \(step 2 of 7\)/)).toBeInTheDocument();
+  });
+
+  it("keeps earlier stages marked done while scanning for security issues", async () => {
+    // Regression test: "scanning_security" used to be missing from STAGES,
+    // so STAGES.indexOf("scanning_security") returned -1 and every prior
+    // step's "done" class briefly disappeared during that stage.
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(jsonResponse({ job_id: "abc123" }))
+      .mockReturnValue(
+        jsonResponse({
+          id: "abc123",
+          status: "running",
+          stage: "scanning_security",
+          markdown: null,
+          error: null,
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App pollIntervalMs={5} />);
+    fireEvent.change(screen.getByPlaceholderText(/github.com/i), {
+      target: { value: "https://github.com/example/example" },
+    });
+    fireEvent.click(screen.getByText("Analyze"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Scanning for security issues")).toHaveClass("done");
+    });
+    expect(screen.getByText("Analyzing code quality")).toHaveClass("done");
+    expect(screen.getByText("Cloning repository")).toHaveClass("done");
   });
 
   it("renders the report once the job is done", async () => {
