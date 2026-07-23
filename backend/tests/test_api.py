@@ -290,6 +290,19 @@ def test_get_job_returns_404_for_unknown_id(monkeypatch, tmp_path):
     assert resp.status_code == 404
 
 
+def test_get_job_includes_created_at_for_refresh_recovery(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url: None)
+
+    create_resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
+    job_id = create_resp.json()["job_id"]
+
+    resp = client.get(f"/jobs/{job_id}")
+
+    assert resp.status_code == 200
+    assert resp.json()["created_at"]
+
+
 def test_job_runs_synchronously_via_submit_override_and_reaches_done(monkeypatch, tmp_path):
     monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
 

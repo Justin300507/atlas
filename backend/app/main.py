@@ -147,4 +147,5 @@ def get_job_endpoint(job_id: str) -> dict:
         "stage": record.stage,
         "markdown": record.markdown,
         "error": record.error,
+        "created_at": record.created_at,
     }

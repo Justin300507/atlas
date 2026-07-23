@@ -13,6 +13,7 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
 describe("App", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    localStorage.clear();
   });
 
   it("shows an inline error when submission fails", async () => {
@@ -140,5 +141,165 @@ describe("App", () => {
 
     fireEvent.click(screen.getByText("Try Again"));
     expect(screen.getByPlaceholderText(/github.com/i)).toBeInTheDocument();
+  });
+
+  it("persists the active job to localStorage and clears it once done", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(jsonResponse({ job_id: "abc123" }))
+      .mockReturnValue(
+        jsonResponse({
+          id: "abc123",
+          status: "done",
+          stage: "generating_documentation",
+          markdown: "## Executive Summary\n\nhello",
+          error: null,
+          created_at: new Date().toISOString(),
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App pollIntervalMs={5} />);
+    fireEvent.change(screen.getByPlaceholderText(/github.com/i), {
+      target: { value: "https://github.com/example/example" },
+    });
+    fireEvent.click(screen.getByText("Analyze"));
+
+    await waitFor(() => {
+      expect(JSON.parse(localStorage.getItem("atlas.activeJob")!)).toEqual({
+        jobId: "abc123",
+        repoUrl: "https://github.com/example/example",
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Executive Summary")).toBeInTheDocument();
+    });
+    expect(localStorage.getItem("atlas.activeJob")).toBeNull();
+  });
+
+  it("recovers a running job from localStorage on mount", async () => {
+    localStorage.setItem(
+      "atlas.activeJob",
+      JSON.stringify({ jobId: "abc123", repoUrl: "https://github.com/example/example" })
+    );
+    const fetchMock = vi.fn().mockReturnValue(
+      jsonResponse({
+        id: "abc123",
+        status: "running",
+        stage: "parsing",
+        markdown: null,
+        error: null,
+        created_at: new Date(Date.now() - 5000).toISOString(),
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App pollIntervalMs={5} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Parsing source files")).toHaveClass("done");
+    });
+    expect(fetchMock.mock.calls[0][0]).toContain("/jobs/abc123");
+  });
+
+  it("restores a finished job directly from localStorage without polling", async () => {
+    localStorage.setItem(
+      "atlas.activeJob",
+      JSON.stringify({ jobId: "abc123", repoUrl: "https://github.com/example/example" })
+    );
+    const fetchMock = vi.fn().mockReturnValueOnce(
+      jsonResponse({
+        id: "abc123",
+        status: "done",
+        stage: "generating_documentation",
+        markdown: "## Executive Summary\n\nhello",
+        error: null,
+        created_at: new Date().toISOString(),
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App pollIntervalMs={5} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Executive Summary")).toBeInTheDocument();
+    });
+    expect(localStorage.getItem("atlas.activeJob")).toBeNull();
+  });
+
+  it("clears a stale job from localStorage when it no longer resolves (404)", async () => {
+    localStorage.setItem(
+      "atlas.activeJob",
+      JSON.stringify({ jobId: "gone", repoUrl: "https://github.com/example/example" })
+    );
+    const fetchMock = vi.fn().mockReturnValueOnce(jsonResponse({ detail: "not found" }, false, 404));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App pollIntervalMs={5} />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/github.com/i)).toBeInTheDocument();
+    });
+    expect(localStorage.getItem("atlas.activeJob")).toBeNull();
+  });
+
+  it("keeps retrying (not clearing) recovery after a transient failure, unlike a real 404", async () => {
+    localStorage.setItem(
+      "atlas.activeJob",
+      JSON.stringify({ jobId: "abc123", repoUrl: "https://github.com/example/example" })
+    );
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(jsonResponse({ detail: "server error" }, false, 500))
+      .mockReturnValue(
+        jsonResponse({
+          id: "abc123",
+          status: "running",
+          stage: "parsing",
+          markdown: null,
+          error: null,
+          created_at: new Date().toISOString(),
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App pollIntervalMs={5} />);
+
+    // A transient (non-404) failure must not discard the saved job or bounce to idle.
+    expect(screen.queryByPlaceholderText(/github.com/i)).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("atlas.activeJob")!).jobId).toBe("abc123");
+
+    await waitFor(() => {
+      expect(screen.getByText("Parsing source files")).toHaveClass("done");
+    });
+  });
+
+  it("recovers correctly against the real backend created_at format (UTC isoformat, microseconds)", async () => {
+    // Python's datetime.now(timezone.utc).isoformat() looks like this -- not the
+    // 3-digit-ms/"Z" shape of JS's Date.prototype.toISOString().
+    const pythonStyleCreatedAt = new Date(Date.now() - 5000).toISOString().replace("Z", "123+00:00");
+    localStorage.setItem(
+      "atlas.activeJob",
+      JSON.stringify({ jobId: "abc123", repoUrl: "https://github.com/example/example" })
+    );
+    const fetchMock = vi.fn().mockReturnValue(
+      jsonResponse({
+        id: "abc123",
+        status: "running",
+        stage: "parsing",
+        markdown: null,
+        error: null,
+        created_at: pythonStyleCreatedAt,
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App pollIntervalMs={5} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/\ds elapsed/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText("NaNs elapsed")).not.toBeInTheDocument();
   });
 });

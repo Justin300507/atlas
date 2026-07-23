@@ -8,6 +8,7 @@ export interface JobRecord {
   stage: string | null;
   markdown: string | null;
   error: string | null;
+  created_at: string;
 }
 
 export async function createJob(repoUrl: string): Promise<{ job_id: string }> {
@@ -23,8 +24,13 @@ export async function createJob(repoUrl: string): Promise<{ job_id: string }> {
   return resp.json();
 }
 
+export class JobNotFoundError extends Error {}
+
 export async function getJob(jobId: string): Promise<JobRecord> {
   const resp = await fetch(`${API_BASE}/jobs/${jobId}`);
+  if (resp.status === 404) {
+    throw new JobNotFoundError(`No job found with id ${jobId}`);
+  }
   if (!resp.ok) {
     throw new Error(`Request failed with status ${resp.status}`);
   }
