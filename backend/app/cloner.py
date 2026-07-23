@@ -10,6 +10,15 @@ from pathlib import Path
 
 _GITHUB_URL_RE = re.compile(r"^https://github\.com/[\w.-]+/[\w.-]+(?:\.git)?/?$")
 
+# Found via real-world validation (2026-07-24): git's stderr on a large,
+# failing clone can be dominated by "Updating files: NN% (...)" progress
+# lines -- one per percentage point, potentially hundreds of lines -- ahead
+# of the actual fatal error (confirmed against vercel/next.js, which fails
+# checkout on Windows due to MAX_PATH). Left as-is, that whole blob became
+# the CloneError message, propagating into job state, logs, and the API
+# response verbatim. Surface only the meaningful fatal/error lines instead.
+_MAX_ERROR_MESSAGE_CHARS = 500
+
 
 class CloneError(Exception):
     pass
@@ -24,6 +33,14 @@ def validate_github_url(url: str) -> None:
         raise InvalidRepoUrlError(f"Not a valid GitHub repository URL: {url}")
 
 
+def _clean_git_error(stderr: str) -> str:
+    lines = [ln for ln in stderr.strip().splitlines() if ln.startswith(("fatal:", "error:"))]
+    message = "\n".join(lines) if lines else stderr.strip()
+    if len(message) > _MAX_ERROR_MESSAGE_CHARS:
+        message = message[:_MAX_ERROR_MESSAGE_CHARS] + " ... (truncated)"
+    return message or "git clone failed"
+
+
 def _clone_to(source: str, dest: str, timeout: int) -> None:
     result = subprocess.run(
         ["git", "clone", "--depth", "1", source, dest],
@@ -33,7 +50,7 @@ def _clone_to(source: str, dest: str, timeout: int) -> None:
         env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
     )
     if result.returncode != 0:
-        raise CloneError(result.stderr.strip() or "git clone failed")
+        raise CloneError(_clean_git_error(result.stderr))
 
 
 @contextmanager
@@ -56,7 +73,7 @@ def _clone_history_to(source: str, dest: str, depth: int, timeout: int) -> None:
         env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
     )
     if result.returncode != 0:
-        raise CloneError(result.stderr.strip() or "git clone failed")
+        raise CloneError(_clean_git_error(result.stderr))
 
 
 @contextmanager

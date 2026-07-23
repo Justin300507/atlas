@@ -6,6 +6,7 @@ import pytest
 from app.cloner import (
     CloneError,
     InvalidRepoUrlError,
+    _clean_git_error,
     _clone_history_to,
     _clone_to,
     clone_with_history,
@@ -85,6 +86,55 @@ def test_clone_with_history_preserves_multiple_commits(tmp_path):
         ["git", "log", "--oneline"], cwd=dest, capture_output=True, text=True, check=True
     )
     assert len(log.stdout.strip().splitlines()) == 3
+
+
+def test_clean_git_error_strips_progress_noise():
+    # Regression test: real-world validation against vercel/next.js produced
+    # hundreds of "Updating files: NN% (...)" progress lines before the
+    # actual fatal error on a Windows MAX_PATH failure.
+    noisy = "\n".join(f"Updating files: {i}% ({i * 100}/10000)" for i in range(100))
+    stderr = (
+        "Cloning into 'dest'...\n"
+        + noisy
+        + "\nerror: unable to create file some/very/long/path.js: Filename too long\n"
+        "fatal: unable to checkout working tree\n"
+    )
+
+    message = _clean_git_error(stderr)
+
+    assert "Updating files" not in message
+    assert "Cloning into" not in message
+    assert "fatal: unable to checkout working tree" in message
+    assert "error: unable to create file some/very/long/path.js" in message
+
+
+def test_clean_git_error_caps_length_when_no_fatal_line_present():
+    stderr = "x" * 2000
+
+    message = _clean_git_error(stderr)
+
+    assert len(message) <= len(" ... (truncated)") + 500
+    assert message.endswith("... (truncated)")
+
+
+def test_clean_git_error_falls_back_to_generic_message_when_empty():
+    assert _clean_git_error("") == "git clone failed"
+
+
+def test_clone_to_error_message_is_clean_not_a_progress_dump(monkeypatch, tmp_path):
+    class _FakeResult:
+        returncode = 128
+        stderr = "Cloning into 'x'...\n" + "\n".join(
+            f"Updating files: {i}%" for i in range(50)
+        ) + "\nfatal: unable to checkout working tree\n"
+
+    monkeypatch.setattr("app.cloner.subprocess.run", lambda *a, **k: _FakeResult())
+
+    with pytest.raises(CloneError) as exc_info:
+        _clone_to("https://github.com/x/y", str(tmp_path / "dest"), timeout=30)
+
+    assert "Updating files" not in str(exc_info.value)
+    assert "fatal: unable to checkout working tree" in str(exc_info.value)
 
 
 def test_clone_with_history_cleans_up_temp_dir(monkeypatch, tmp_path):
