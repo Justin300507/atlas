@@ -160,12 +160,12 @@ def create_job_endpoint(request: AnalyzeRequest) -> dict:
     except InvalidRepoUrlError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     jobs.cleanup_stale_jobs(_JOB_RETENTION_HOURS)
-    if jobs.count_active_jobs() >= _MAX_ACTIVE_JOBS:
+    job_id = jobs.try_create_job(request.repo_url, _MAX_ACTIVE_JOBS)
+    if job_id is None:
         raise HTTPException(
             status_code=429,
             detail="Too many analyses are already in progress. Try again shortly.",
         )
-    job_id = jobs.create_job(request.repo_url)
     _submit_job(job_id, request.repo_url)
     return {"job_id": job_id}
 

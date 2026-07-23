@@ -10,6 +10,21 @@ from .models import CoChangePair, FileChurn, FileOwnership, GitIntelligenceRepor
 _TOP_N = 20
 _BUG_FIX_PATTERN = re.compile(r"\b(fix|fixes|fixed|bug|hotfix|patch|bugfix)\b", re.IGNORECASE)
 
+# combinations(k, 2) is O(k^2) -- a commit that touches an unusually large
+# number of files (an initial import, a mass rename, a lockfile regen, or a
+# large deliberate refactor/formatter run) is unlikely to carry meaningful
+# "these files habitually change together" signal even when deliberate, but
+# computing it anyway is a real combinatorial-explosion risk regardless of
+# why the commit is large:
+# a single commit touching ~3,000 files (not contrived -- this is exactly
+# what almost every real repo's first commit looks like) produces ~4.9
+# million pairs, which measured as a multi-second, multi-GB-transient-
+# memory spike in this project's own load-testing benchmark. Skipping
+# co-change accounting for such commits is both a performance fix and a
+# correctness one -- per-file commit_count/bug_fix_count/ownership below
+# are unaffected and still count every file in these commits normally.
+_MAX_FILES_PER_COMMIT_FOR_COCHANGE = 100
+
 
 def analyze_git_history(commits: list[Commit], history_truncated: bool) -> GitIntelligenceReport:
     commit_counts: dict[str, int] = defaultdict(int)
@@ -27,8 +42,10 @@ def analyze_git_history(commits: list[Commit], history_truncated: bool) -> GitIn
                 bug_fix_counts[path] += 1
             author_counts[path][commit.author_email] += 1
 
-        for path_a, path_b in combinations(sorted(set(paths)), 2):
-            co_change_counts[(path_a, path_b)] += 1
+        unique_paths = sorted(set(paths))
+        if len(unique_paths) <= _MAX_FILES_PER_COMMIT_FOR_COCHANGE:
+            for path_a, path_b in combinations(unique_paths, 2):
+                co_change_counts[(path_a, path_b)] += 1
 
     churn = sorted(
         (

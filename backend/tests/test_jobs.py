@@ -2,10 +2,18 @@ import os
 import subprocess
 import sqlite3
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from app.jobs import cleanup_stale_jobs, count_active_jobs, create_job, get_job, update_job
+from app.jobs import (
+    cleanup_stale_jobs,
+    count_active_jobs,
+    create_job,
+    get_job,
+    try_create_job,
+    update_job,
+)
 
 BACKEND_DIR = Path(__file__).parent.parent
 
@@ -106,6 +114,39 @@ def test_count_active_jobs_counts_queued_and_running_but_not_done_or_error(tmp_p
 
     assert count_active_jobs(db_path=db_path) == 2
     assert queued  # keep referenced for clarity of intent
+
+
+def test_try_create_job_returns_none_once_at_capacity(tmp_path):
+    db_path = tmp_path / "jobs.db"
+
+    accepted = [try_create_job(f"https://github.com/example/{i}", max_active=3, db_path=db_path) for i in range(3)]
+    assert all(job_id is not None for job_id in accepted)
+
+    rejected = try_create_job("https://github.com/example/overflow", max_active=3, db_path=db_path)
+    assert rejected is None
+    assert count_active_jobs(db_path=db_path) == 3
+
+
+def test_try_create_job_is_atomic_under_concurrent_callers(tmp_path):
+    # Regression test: a plain "count, then insert" (two separate
+    # statements) lets many concurrent callers all read a count under the
+    # cap before any of them commits, so far more than max_active jobs get
+    # created. This exercises try_create_job's single atomic
+    # INSERT ... SELECT ... WHERE with real concurrent threads hitting the
+    # same db file, not just sequential calls.
+    db_path = tmp_path / "jobs.db"
+    max_active = 5
+    request_count = 40
+
+    def attempt(i: int) -> str | None:
+        return try_create_job(f"https://github.com/example/{i}", max_active=max_active, db_path=db_path)
+
+    with ThreadPoolExecutor(max_workers=request_count) as pool:
+        results = list(pool.map(attempt, range(request_count)))
+
+    accepted = [r for r in results if r is not None]
+    assert len(accepted) == max_active
+    assert count_active_jobs(db_path=db_path) == max_active
 
 
 def test_cleanup_stale_jobs_removes_only_finished_jobs_older_than_max_age(tmp_path):

@@ -73,6 +73,31 @@ def create_job(repo_url: str, db_path: Path | None = None) -> str:
     return job_id
 
 
+def try_create_job(repo_url: str, max_active: int, db_path: Path | None = None) -> str | None:
+    """Atomically create a job only if under `max_active` -- a plain
+    "check count, then insert" (two statements) has a real TOCTOU race
+    under concurrent requests: several callers can all read a count under
+    the cap before any of them commits their insert, letting far more than
+    `max_active` jobs through at once. A single INSERT ... SELECT ... WHERE
+    is one statement, so SQLite's own write-locking makes the count check
+    and the insert atomic with respect to other connections."""
+    resolved_path = _resolve_db_path(db_path)
+    job_id = str(uuid.uuid4())
+    now = _now()
+    conn = _connect(resolved_path)
+    try:
+        cursor = conn.execute(
+            "INSERT INTO jobs (id, repo_url, status, stage, markdown, error, created_at, updated_at) "
+            "SELECT ?, ?, 'queued', NULL, NULL, NULL, ?, ? "
+            "WHERE (SELECT COUNT(*) FROM jobs WHERE status IN ('queued', 'running')) < ?",
+            (job_id, repo_url, now, now, max_active),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return job_id if cursor.rowcount == 1 else None
+
+
 def update_job(
     job_id: str,
     *,
