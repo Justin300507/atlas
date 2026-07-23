@@ -45,3 +45,26 @@ def shallow_clone(url: str, timeout: int = 60):
         yield Path(tmp_dir)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def _clone_history_to(source: str, dest: str, depth: int, timeout: int) -> None:
+    result = subprocess.run(
+        ["git", "clone", "--depth", str(depth), source, dest],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+    )
+    if result.returncode != 0:
+        raise CloneError(result.stderr.strip() or "git clone failed")
+
+
+@contextmanager
+def clone_with_history(url: str, depth: int = 500, timeout: int = 120):
+    validate_github_url(url)
+    tmp_dir = tempfile.mkdtemp(prefix="atlas-clone-history-")
+    try:
+        _clone_history_to(url, tmp_dir, depth, timeout)
+        yield Path(tmp_dir)
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
