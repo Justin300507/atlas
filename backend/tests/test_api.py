@@ -4,6 +4,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app import jobs as app_jobs
+from app import main as app_main
 from app.main import app
 
 client = TestClient(app)
@@ -221,3 +223,97 @@ def test_documentation_returns_markdown_report(tmp_path, monkeypatch):
 def test_documentation_rejects_invalid_url():
     resp = client.post("/documentation", json={"repo_url": "not-a-url"})
     assert resp.status_code == 400
+
+
+def test_create_job_returns_202_with_job_id(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url: None)
+
+    resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
+
+    assert resp.status_code == 202
+    body = resp.json()
+    assert "job_id" in body
+    assert app_jobs.get_job(body["job_id"]) is not None
+
+
+def test_create_job_rejects_invalid_url(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+
+    resp = client.post("/jobs", json={"repo_url": "not-a-url"})
+
+    assert resp.status_code == 400
+
+
+def test_get_job_returns_404_for_unknown_id(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+
+    resp = client.get("/jobs/does-not-exist")
+
+    assert resp.status_code == 404
+
+
+def test_job_runs_synchronously_via_submit_override_and_reaches_done(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+
+    structure_fixture = FIXTURES / "fastapi_repo"
+    history_repo = tmp_path / "history_repo"
+    history_repo.mkdir()
+    subprocess.run(["git", "init"], cwd=history_repo, check=True, capture_output=True)
+    (history_repo / "a.py").write_text("1\n")
+    subprocess.run(["git", "add", "a.py"], cwd=history_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=test@test.com", "-c", "user.name=test", "commit", "-m", "init"],
+        cwd=history_repo,
+        check=True,
+        capture_output=True,
+    )
+
+    @contextmanager
+    def fake_shallow_clone(url, timeout=60):
+        yield structure_fixture
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield history_repo
+
+    monkeypatch.setattr("app.report_pipeline.shallow_clone", fake_shallow_clone)
+    monkeypatch.setattr("app.report_pipeline.clone_with_history", fake_clone_with_history)
+    # Run the job inline instead of on a background thread, so the test is
+    # deterministic — _submit_job and _run_job share the same (job_id,
+    # repo_url) signature, so this substitution is exact.
+    monkeypatch.setattr("app.main._submit_job", app_main._run_job)
+
+    create_resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
+    job_id = create_resp.json()["job_id"]
+
+    status_resp = client.get(f"/jobs/{job_id}")
+    body = status_resp.json()
+
+    assert body["status"] == "done"
+    assert body["error"] is None
+    assert "## Executive Summary" in body["markdown"]
+
+
+def test_job_records_error_on_clone_failure(monkeypatch, tmp_path):
+    from app.cloner import CloneError
+
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+
+    @contextmanager
+    def failing_clone(url, timeout=60):
+        raise CloneError("repository not found")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr("app.report_pipeline.shallow_clone", failing_clone)
+    monkeypatch.setattr("app.main._submit_job", app_main._run_job)
+
+    create_resp = client.post("/jobs", json={"repo_url": "https://github.com/example/does-not-exist"})
+    job_id = create_resp.json()["job_id"]
+
+    status_resp = client.get(f"/jobs/{job_id}")
+    body = status_resp.json()
+
+    assert body["status"] == "error"
+    assert body["error"] == "repository not found"
+    assert body["markdown"] is None

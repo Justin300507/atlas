@@ -61,6 +61,26 @@ imports, git history, repo structure) versus known limitations (no CommonJS
 deterministic — no LLM call, no data beyond what the other three endpoints
 already compute.
 
+## Jobs (async analysis with progress)
+
+```bash
+curl -X POST http://127.0.0.1:8000/jobs \
+  -H "Content-Type: application/json" \
+  -d "{\"repo_url\": \"https://github.com/octocat/Hello-World\"}"
+# => {"job_id": "..."}
+
+curl http://127.0.0.1:8000/jobs/<job_id>
+# => {"id": "...", "status": "running", "stage": "analyzing_quality", "markdown": null, "error": null}
+```
+
+Runs the same pipeline as `/documentation`, but asynchronously: `POST /jobs`
+returns a job id immediately (202), and the analysis runs on a background thread.
+Poll `GET /jobs/{job_id}` (roughly once a second) until `status` is `"done"`
+(`markdown` populated) or `"error"` (`error` populated). Job state is persisted to
+a local SQLite file (`backend/atlas_jobs.db`, created automatically, gitignored) —
+not in-memory-only, so job state survives a backend restart; not Redis, so nothing
+extra needs to be installed to run this locally.
+
 ## Test
 
 ```bash
