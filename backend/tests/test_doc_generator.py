@@ -139,6 +139,28 @@ def test_dependency_diagram_caps_at_40_nodes_with_note():
     assert "capped for readability" in doc
 
 
+def test_dependency_diagram_ranks_by_import_degree_not_route_degree():
+    graph = nx.DiGraph()
+    chain = [str(REPO_ROOT / f"mod_{i}.py") for i in range(40)]
+    for node in chain:
+        graph.add_node(node, type="module")
+    for i in range(39):
+        graph.add_edge(chain[i], chain[i + 1], type="import")
+
+    route_heavy = str(REPO_ROOT / "route_heavy.py")
+    graph.add_node(route_heavy, type="module")
+    for i in range(20):
+        route_id = f"route:GET /path{i}"
+        graph.add_node(route_id, type="route")
+        graph.add_edge(route_heavy, route_id, type="route")
+
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], graph, _empty_quality(), _empty_git())
+
+    assert "route_heavy.py" not in doc
+    assert "mod_0.py" in doc
+    assert "mod_39.py" in doc
+
+
 def test_empty_repo_renders_without_crashing():
     doc = generate_documentation(
         REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_git()

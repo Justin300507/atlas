@@ -52,9 +52,11 @@ consumes, rather than extends, the existing pipeline.
     scores. Deferred until a model-detection subsystem exists.
   - **Narrative Onboarding Guide** — a prose "here's how to get started" walkthrough
     needs synthesis/summarization, which is an AI Engine job (per the roadmap's
-    "AI Architect" phase), not a deterministic-rendering job. v1 substitutes a
-    **Getting Started** section built entirely from `StackReport` fields (detected
-    backend/frontend/db/auth/deployment) — real detected facts, not generated prose.
+    "AI Architect" phase), not a deterministic-rendering job. v1 doesn't ship a
+    separate section for this; the detected `StackReport` facts (backend/frontend/
+    db/auth/deployment) that a narrative guide would open with are already surfaced
+    in Executive Summary, so there's no separate "Getting Started" section — folding
+    it there avoids a section that would just restate Executive Summary's content.
   - **Ownership / co-change data in the report** — already fully exposed by
     `/git-intelligence` directly; duplicating the entire payload into the Markdown
     report would bloat it for no benefit. The Risk Areas / High-Churn sections are

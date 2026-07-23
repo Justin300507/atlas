@@ -214,6 +214,8 @@ def test_documentation_returns_markdown_report(tmp_path, monkeypatch):
     assert "## Executive Summary" in markdown
     assert "## API Reference" in markdown
     assert "/users" in markdown
+    assert "Commits analyzed: 1" in markdown
+    assert "a.py" in markdown.split("## Recent High-Churn Components")[1]
 
 
 def test_documentation_rejects_invalid_url():

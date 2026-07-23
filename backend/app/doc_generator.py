@@ -132,7 +132,20 @@ def _dependency_diagram(graph: nx.DiGraph) -> str:
         lines.append("No modules detected.")
         return "\n".join(lines)
 
-    selected = sorted(module_nodes, key=lambda n: (-graph.degree(n), n))[:_DIAGRAM_NODE_CAP]
+    # Rank by import-edge degree only: this diagram only ever draws import
+    # edges, so ranking by total graph degree (which route edges also count
+    # toward) can let an import-disconnected, route-heavy module consume a
+    # cap slot while rendering as an invisible, edge-less node.
+    import_degree: dict[str, int] = dict.fromkeys(module_nodes, 0)
+    for u, v, d in graph.edges(data=True):
+        if d.get("type") != "import":
+            continue
+        if u in import_degree:
+            import_degree[u] += 1
+        if v in import_degree:
+            import_degree[v] += 1
+
+    selected = sorted(module_nodes, key=lambda n: (-import_degree[n], n))[:_DIAGRAM_NODE_CAP]
     selected_set = set(selected)
     node_ids = {n: f"n{i}" for i, n in enumerate(selected)}
 
