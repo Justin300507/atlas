@@ -1,0 +1,48 @@
+name: Docker validate
+
+# Proves the docker-compose stack actually builds and boots, since no
+# machine in local dev has Docker installed to run this by hand -- see
+# DEPLOYMENT.md. Not a substitute for the pytest/vitest suites; this only
+# checks the container wiring (build, healthcheck, port mapping, env
+# plumbing), which unit tests can't see.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "docker-compose.yml"
+      - ".github/workflows/docker-validate.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "docker-compose.yml"
+      - ".github/workflows/docker-validate.yml"
+  workflow_dispatch:
+
+jobs:
+  compose-up:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start the stack
+        run: docker compose up --build -d --wait --wait-timeout 120
+
+      - name: Backend health check
+        run: |
+          status=$(curl -sf http://localhost:8000/health | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])")
+          echo "backend /health status: $status"
+          test "$status" = "ok"
+
+      - name: Frontend serves the app shell
+        run: curl -sf http://localhost:5173/ | grep -qi "<div id=\"root\"" || (echo "frontend did not return the expected app shell" && exit 1)
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
