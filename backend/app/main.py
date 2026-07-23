@@ -11,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import jobs
-from .config import resolve_cors_origins, resolve_log_level
 from .cloner import (
     CloneError,
     InvalidRepoUrlError,
@@ -19,6 +18,7 @@ from .cloner import (
     shallow_clone,
     validate_github_url,
 )
+from .config import resolve_cors_origins, resolve_log_level
 from .git_intelligence import analyze_git_history
 from .git_log_parser import parse_git_log
 from .graph_builder import to_node_link

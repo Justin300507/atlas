@@ -29,10 +29,10 @@ import psutil
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.doc_generator import generate_documentation
 from app.git_intelligence import analyze_git_history
 from app.git_log_parser import parse_git_log
 from app.report_pipeline import analyze_structure, run_full_analysis
-from app.doc_generator import generate_documentation
 from scripts.generate_synthetic_repo import generate_synthetic_repo
 
 REAL_REPOS = [

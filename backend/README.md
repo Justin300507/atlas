@@ -14,6 +14,22 @@ python -m venv .venv
 .venv/Scripts/python -m uvicorn app.main:app --reload
 ```
 
+## Linting
+
+```bash
+.venv/Scripts/python -m pip install -r requirements-dev.txt
+.venv/Scripts/python -m ruff check .
+```
+
+Configured in `ruff.toml` for pyflakes (unused imports/vars, undefined
+names) and import ordering only -- not full pycodestyle line-length
+enforcement, since this codebase predates a line-length convention and
+retroactively enforcing one would mean reformatting existing code with no
+behavioral benefit. `tests/fixtures/` is excluded: those files are
+deliberately-crafted parser test inputs (e.g. an intentionally-unused
+import that `code_parser`'s tests exercise on purpose), not real
+application code.
+
 ## Configuration
 
 Two environment variables control CORS (see

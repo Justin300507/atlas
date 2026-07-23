@@ -1,0 +1,14 @@
+target-version = "py312"
+
+# tests/fixtures/ holds deliberately-crafted parser test inputs (e.g. an
+# unused import that code_parser's tests exercise on purpose) -- not real
+# application code, so linting it produces false positives, not findings.
+extend-exclude = ["tests/fixtures"]
+
+[lint]
+# F (pyflakes) and I (isort) catch real problems -- unused imports/vars,
+# undefined names, import ordering. Full pycodestyle (E/W) is deliberately
+# not enabled: this codebase was never written to an 88-char line limit,
+# and retroactively enforcing one would mean reformatting ~150 existing
+# lines with no behavioral benefit, not fixing real bugs.
+select = ["F", "I"]

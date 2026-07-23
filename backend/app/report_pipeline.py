@@ -5,7 +5,7 @@ from typing import Callable
 
 import networkx as nx
 
-from .cloner import CloneError, InvalidRepoUrlError, clone_with_history
+from .cloner import clone_with_history
 from .code_parser import FileSymbols, parse_file
 from .doc_generator import generate_documentation
 from .git_intelligence import analyze_git_history

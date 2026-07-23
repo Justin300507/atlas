@@ -1,0 +1,3 @@
+# Dev-only tooling. Not installed in the Docker image / production
+# deployment.
+ruff>=0.15,<1.0
