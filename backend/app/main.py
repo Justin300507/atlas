@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import jobs
 from .config import resolve_cors_origins, resolve_log_level
@@ -49,6 +52,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Tags every request with a correlation ID (reusing an inbound
+    X-Request-ID if the caller/a proxy already set one) and logs a basic
+    access line -- the first general-purpose log line in the app beyond
+    per-job stage timing."""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        request.state.request_id = request_id
+        start = time.monotonic()
+        try:
+            response = await call_next(request)
+        except Exception:
+            # call_next raises (rather than returning a response) for an
+            # unhandled exception in the route -- exactly the case where a
+            # correlation ID matters most, so still log it before
+            # re-raising. There's no response object at this point to
+            # attach X-Request-ID to; the log line is what actually
+            # correlates this to whatever error handling produces the
+            # eventual client-facing response.
+            duration_ms = (time.monotonic() - start) * 1000
+            logger.info(
+                "%s %s -> 500 (%.1fms) [request_id=%s] (unhandled exception)",
+                request.method,
+                request.url.path,
+                duration_ms,
+                request_id,
+            )
+            raise
+        duration_ms = (time.monotonic() - start) * 1000
+        response.headers["X-Request-ID"] = request_id
+        logger.info(
+            "%s %s -> %d (%.1fms) [request_id=%s]",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+            request_id,
+        )
+        return response
+
+
+app.add_middleware(RequestIDMiddleware)
+
 _JOB_EXECUTOR = ThreadPoolExecutor(max_workers=4)
 
 # There's still no auth or per-user quota, and CORS is permissive by default
@@ -82,7 +130,20 @@ def rate_limit(request: Request) -> None:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    try:
+        jobs.count_active_jobs()
+        db_check = "ok"
+    except Exception as exc:
+        # The full exception (which can include the DB's filesystem path)
+        # goes to the logs, not the response body -- /health is
+        # unauthenticated, so anything more specific than the exception
+        # type here would leak server filesystem details to any caller.
+        logger.error("health check: database check failed: %s", exc)
+        db_check = f"error: {type(exc).__name__}"
+    return {
+        "status": "ok" if db_check == "ok" else "degraded",
+        "checks": {"database": db_check},
+    }
 
 
 @app.post("/analyze", response_model=AnalyzeResponse, dependencies=[Depends(rate_limit)])
