@@ -57,6 +57,21 @@ def test_ownership_picks_majority_author():
     assert owner.ownership_ratio == pytest.approx(2 / 3)
 
 
+def test_ownership_tie_breaks_to_first_author_encountered():
+    commits = [
+        Commit("h1", "alice@x.com", "msg", [FileChange("a.py", 1, 0)]),
+        Commit("h2", "bob@x.com", "msg", [FileChange("a.py", 1, 0)]),
+    ]
+
+    report = analyze_git_history(commits, history_truncated=False)
+
+    owner = report.ownership[0]
+    assert owner.top_author == "alice@x.com"
+    assert owner.top_author_commits == 1
+    assert owner.total_commits == 2
+    assert owner.ownership_ratio == pytest.approx(0.5)
+
+
 def test_co_change_counts_all_pairs_in_multi_file_commit():
     commits = [
         Commit(

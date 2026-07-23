@@ -2,6 +2,7 @@ import subprocess
 
 import pytest
 
+from app.cloner import _clone_history_to
 from app.git_log_parser import parse_git_log
 
 
@@ -56,4 +57,47 @@ def test_parse_git_log_reports_truncation(repo):
     commits, truncated = parse_git_log(repo, max_commits=2)
 
     assert len(commits) == 2
+    assert truncated is True
+
+
+def test_parse_git_log_skips_binary_file_numstat_lines(tmp_path):
+    _init_repo(tmp_path)
+    (tmp_path / "text.py").write_text("1\n")
+    (tmp_path / "image.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00")
+    subprocess.run(["git", "add", "text.py", "image.png"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=test@test.com", "-c", "user.name=test", "commit", "-m", "add binary and text"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    commits, _ = parse_git_log(tmp_path, max_commits=500)
+
+    paths = {f.path for f in commits[0].files}
+    assert paths == {"text.py"}
+
+
+def test_parse_git_log_handles_repo_with_no_commits(tmp_path):
+    _init_repo(tmp_path)
+
+    commits, truncated = parse_git_log(tmp_path, max_commits=500)
+
+    assert commits == []
+    assert truncated is False
+
+
+def test_parse_git_log_detects_truncation_through_bounded_clone(tmp_path):
+    source = tmp_path / "source_repo"
+    source.mkdir()
+    _init_repo(source)
+    for i in range(10):
+        _commit(source, f"commit {i}", "author@example.com", {"file.txt": f"version {i}"})
+
+    dest = tmp_path / "dest_repo"
+    _clone_history_to(str(source), str(dest), depth=6, timeout=30)
+
+    commits, truncated = parse_git_log(dest, max_commits=5)
+
+    assert len(commits) == 5
     assert truncated is True

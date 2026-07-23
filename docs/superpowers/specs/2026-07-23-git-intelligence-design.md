@@ -182,6 +182,24 @@ for added/removed) rather than crashing the whole request.
 No new dependencies — `git` CLI (already a hard requirement via `cloner.py`) is the
 only tool used, invoked via `subprocess` (already imported in `cloner.py`).
 
+## Addenda from implementation review
+
+- **No shared tempdir/cleanup helper was extracted.** The Components section above
+  originally called for factoring `shallow_clone`/`clone_with_history`'s shared
+  tempdir/validate/cleanup logic into a helper. The implementation plan overrode this:
+  two small, near-identical context managers were judged clearer than a helper with a
+  callback parameter, and that's what shipped. Documented here so this spec doesn't
+  describe an abstraction that doesn't exist.
+- **Truncation detection required cloning one commit deeper than what's analyzed.**
+  The original plan's `-n{max_commits + 1}` trick only works if the local clone
+  actually *has* a spare commit beyond `max_commits` to find — but `clone_with_history`
+  bounds the clone itself, so cloning and analyzing the same depth made
+  `history_truncated` always `False` in practice (caught in review, reproduced
+  empirically). Fixed by having the caller (`main.py`) clone at
+  `_GIT_HISTORY_COMMITS + 1` while analyzing only `_GIT_HISTORY_COMMITS`, so a
+  genuinely-truncated repo always leaves one extra commit locally for the check to
+  find.
+
 ## Out of scope for this phase (explicitly deferred)
 
 Directory-level churn rollups, per-author leaderboards, time-windowed churn (e.g.

@@ -25,6 +25,13 @@ _EXCLUDED_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__", "dist"
 _MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024  # skip individual files larger than this
 _MAX_FILES_PER_REPO = 5000  # stop walking a repo after yielding this many files
 
+# The commit window analyzed by /git-intelligence. The clone depth is set one
+# commit deeper than what's analyzed so a truncated repo always has a spare
+# commit locally for parse_git_log's truncation check to find — cloning and
+# analyzing the exact same depth would make history_truncated always False,
+# since a --depth-N clone physically cannot contain an (N+1)th commit.
+_GIT_HISTORY_COMMITS = 500
+
 
 @app.get("/health")
 def health() -> dict:
@@ -80,8 +87,8 @@ def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
 @app.post("/git-intelligence", response_model=GitIntelligenceReport)
 def git_intelligence(request: AnalyzeRequest) -> GitIntelligenceReport:
     try:
-        with clone_with_history(request.repo_url) as repo_path:
-            commits, history_truncated = parse_git_log(repo_path)
+        with clone_with_history(request.repo_url, depth=_GIT_HISTORY_COMMITS + 1) as repo_path:
+            commits, history_truncated = parse_git_log(repo_path, max_commits=_GIT_HISTORY_COMMITS)
             return analyze_git_history(commits, history_truncated)
     except InvalidRepoUrlError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

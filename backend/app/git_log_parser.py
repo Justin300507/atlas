@@ -35,8 +35,13 @@ def parse_git_log(repo_path: Path, max_commits: int = 500) -> tuple[list[Commit]
         cwd=repo_path,
         capture_output=True,
         text=True,
-        check=True,
     )
+    if result.returncode != 0:
+        # A repo with no commits yet is a legitimate degenerate case (e.g. a
+        # freshly-created GitHub repo before the first push), not a clone
+        # failure — `git log` exits non-zero with "does not have any commits
+        # yet" rather than returning empty output.
+        return [], False
 
     commits = _parse_log_output(result.stdout)
     truncated = len(commits) > max_commits
