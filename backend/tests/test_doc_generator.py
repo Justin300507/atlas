@@ -108,6 +108,25 @@ def test_risk_areas_lists_quality_issues_with_relative_paths():
     assert str(REPO_ROOT) not in doc
 
 
+def test_risk_areas_caps_at_20_with_overflow_note():
+    # Regression test: a real-repo validation run produced tens of thousands
+    # of quality issues before the circular-import scoring redesign, and
+    # dumping all of them into the report produced tens of megabytes of
+    # Markdown. Risk Areas must never render more than a bounded number of
+    # findings inline.
+    issues = [
+        QualityIssue(file=f"app/mod_{i}.py", line=1, kind="long_function", message="x", severity="minor")
+        for i in range(25)
+    ]
+    quality = QualityReport(overall_score=0, maintainability_score=0, architecture_score=100, issues=issues)
+
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], nx.DiGraph(), quality, _empty_git())
+
+    section = doc.split("## Risk Areas")[1].split("## ")[0]
+    assert section.count("mod_") == 20
+    assert "and 5 additional findings" in section
+
+
 def test_high_churn_section_lists_top_files_and_truncation_state():
     git_report = GitIntelligenceReport(
         commits_analyzed=500,

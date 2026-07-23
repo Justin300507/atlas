@@ -9,6 +9,7 @@ from .models import GitIntelligenceReport, QualityReport, StackReport
 
 _DIAGRAM_NODE_CAP = 40
 _HIGH_CHURN_LIMIT = 10
+_RISK_AREAS_LIMIT = 20
 _SEVERITY_ORDER = {"critical": 0, "important": 1, "minor": 2}
 
 
@@ -173,9 +174,15 @@ def _risk_areas(repo_root: Path, quality: QualityReport) -> str:
         return "\n".join(lines)
 
     ordered = sorted(quality.issues, key=lambda i: _SEVERITY_ORDER.get(i.severity, 99))
-    for issue in ordered:
+    shown = ordered[:_RISK_AREAS_LIMIT]
+    for issue in shown:
         rel = _relative(repo_root, issue.file)
         lines.append(f"- **{issue.severity}** `{rel}:{issue.line}` {issue.kind}: {issue.message}")
+
+    remainder = len(ordered) - len(shown)
+    if remainder > 0:
+        lines.append("")
+        lines.append(f"_...and {remainder} additional findings._")
     return "\n".join(lines)
 
 
