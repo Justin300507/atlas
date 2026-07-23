@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Atlas — software intelligence, not artificial intelligence</title>
+<meta name="description" content="Atlas analyzes a public GitHub repository and returns architecture, code quality, git history, and security findings — from deterministic static analysis, not an LLM's guess." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%2314213d'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%23e85d2c' stroke-width='2.5'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/landing.css" />
+</head>
+<body>
+
+<header class="titlebar">
+  <div class="wrap">
+    <div class="wordmark">ATLAS<span class="tick">.</span></div>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#features">What it finds</a>
+      <a href="#interface">Interface</a>
+      <a href="#proof">Real output</a>
+      <a href="https://github.com/Justin300507/atlas">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <p class="eyebrow">SOFTWARE INTELLIGENCE PLATFORM · <strong>NO LLM IN THE PIPELINE</strong></p>
+      <h1>Understand a codebase<br />before you touch it. <em>For real.</em></h1>
+      <p class="lede">Paste a public GitHub URL. Atlas clones it, parses it, and hands back architecture, code quality, git history, and security findings — every one traceable to an AST, a graph algorithm, or a commit log, not a model's best guess.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://github.com/Justin300507/atlas/blob/main/docs/examples/typer-report.md">Read a real report</a>
+        <a class="btn btn-ghost" href="https://github.com/Justin300507/atlas">View source on GitHub</a>
+      </div>
+      <div class="hero-meta">
+        <span><b>Engines</b> 6 shipped</span>
+        <span><b>Analysis</b> 100% deterministic</span>
+        <span><b>Tests</b> 170+ passing</span>
+        <span><b>Status</b> pre-release</span>
+      </div>
+    </div>
+
+    <div class="hero-diagram reveal">
+      <div class="diagram-frame">
+        <span class="corner-tick tl"></span><span class="corner-tick tr"></span>
+        <span class="corner-tick bl"></span><span class="corner-tick br"></span>
+        <svg viewBox="0 0 460 380" role="img" aria-label="Diagram of a dependency graph Atlas builds from a real repository, with two annotations: a circular-import cluster and a high-fan-in module.">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#7fa8d4"></path>
+            </marker>
+          </defs>
+
+          <g stroke="#7fa8d4" stroke-width="1.4" stroke-dasharray="4 3" fill="none" marker-end="url(#arrow)">
+            <path d="M130,57 L200,45" />
+            <path d="M290,57 L340,77" />
+            <path d="M290,68 L245,140" />
+            <path d="M130,74 L200,150" />
+            <path d="M245,157 L130,175" />
+            <path d="M245,174 L280,180" />
+            <path d="M380,94 L380,180" />
+          </g>
+          <path d="M245,150 C 230,110 240,80 285,66" stroke="#e85d2c" stroke-width="1.4" fill="none" stroke-dasharray="2 3" />
+
+          <g font-family="IBM Plex Mono, monospace" font-size="11" fill="#14213d">
+            <g>
+              <rect x="40" y="40" width="90" height="32" rx="3" fill="#ffffff" stroke="#14213d" stroke-width="1.3"/>
+              <text x="85" y="60" text-anchor="middle">api.py</text>
+            </g>
+            <g>
+              <rect x="200" y="28" width="90" height="32" rx="3" fill="#ffffff" stroke="#e85d2c" stroke-width="1.6"/>
+              <text x="245" y="48" text-anchor="middle">auth.py</text>
+            </g>
+            <g>
+              <rect x="340" y="62" width="80" height="32" rx="3" fill="#ffffff" stroke="#14213d" stroke-width="1.3"/>
+              <text x="380" y="82" text-anchor="middle">jwt.py</text>
+            </g>
+            <g>
+              <rect x="200" y="142" width="90" height="32" rx="3" fill="#ffffff" stroke="#e85d2c" stroke-width="1.6"/>
+              <text x="245" y="162" text-anchor="middle">db.py</text>
+            </g>
+            <g>
+              <rect x="40" y="158" width="90" height="32" rx="3" fill="#ffffff" stroke="#14213d" stroke-width="1.3"/>
+              <text x="85" y="178" text-anchor="middle">models.py</text>
+            </g>
+            <g>
+              <rect x="340" y="164" width="80" height="32" rx="3" fill="#ffffff" stroke="#14213d" stroke-width="1.3"/>
+              <text x="380" y="184" text-anchor="middle">tests/</text>
+            </g>
+          </g>
+
+          <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="#e85d2c">
+            <circle cx="245" cy="150" r="3.5" fill="#e85d2c" />
+            <path d="M245,150 L120,225" stroke="#e85d2c" stroke-width="1" fill="none"/>
+            <text x="30" y="240">↳ 2-module cycle: auth.py ⇄ db.py</text>
+
+            <circle cx="290" cy="44" r="3.5" fill="#e85d2c" />
+            <path d="M290,44 L420,20" stroke="#e85d2c" stroke-width="1" fill="none"/>
+            <text x="330" y="16">↳ auth.py — 6 incoming edges</text>
+          </g>
+
+          <text x="20" y="360" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#5b6472">graph_builder.py → quality_engine.py — actual output shape, not an illustration</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="strip">
+  <div class="wrap">
+    <span class="mark">§</span>
+    <p>Every score, edge, and finding in a report traces back to something you can point at: a tree-sitter <code>AST</code>, a <code>networkx</code> graph algorithm, or a parsed <code>git log</code> — never a language model's summary of your code.</p>
+  </div>
+</div>
+
+<section class="sheet" id="how">
+  <div class="wrap">
+    <div class="sheet-head reveal">
+      <div>
+        <p class="sheet-tag">Sheet 01 — Pipeline</p>
+        <h2>How a URL becomes a report</h2>
+      </div>
+      <p class="sheet-sub">Five real stages, run in order, on your machine or the CI runner that validates them.</p>
+    </div>
+
+    <div class="pipeline">
+      <div class="pstep reveal">
+        <div class="num">1</div>
+        <div class="title">Clone</div>
+        <div class="module">clone_with_history</div>
+        <p class="desc">One shallow-plus-history clone — not two separate fetches for the analysis and the git log.</p>
+      </div>
+      <div class="pstep reveal">
+        <div class="num">2</div>
+        <div class="title">Parse</div>
+        <div class="module">code_parser.py</div>
+        <p class="desc">Tree-sitter builds real ASTs for Python and JS/TS/JSX/TSX — no regex guessing at syntax.</p>
+      </div>
+      <div class="pstep reveal">
+        <div class="num">3</div>
+        <div class="title">Graph</div>
+        <div class="module">graph_builder.py</div>
+        <p class="desc">Imports, routes, and modules become a directed graph — the shape everything below reasons over.</p>
+      </div>
+      <div class="pstep reveal">
+        <div class="num">4</div>
+        <div class="title">Analyze</div>
+        <div class="module">quality · security · git_intel</div>
+        <p class="desc">Circular imports, complexity, secrets, churn, and ownership — read off the graph and the log.</p>
+      </div>
+      <div class="pstep reveal">
+        <div class="num">5</div>
+        <div class="title">Report</div>
+        <div class="module">doc_generator.py</div>
+        <p class="desc">One Markdown report — architecture, risk areas, a Mermaid diagram, recent hotspots.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sheet" id="features" style="padding-top:0;">
+  <div class="wrap">
+    <div class="sheet-head reveal">
+      <div>
+        <p class="sheet-tag">Sheet 02 — Engines</p>
+        <h2>What it finds</h2>
+      </div>
+      <p class="sheet-sub">Six independent engines. Each produces structured data; none of them phone out to an LLM.</p>
+    </div>
+
+    <div class="features reveal">
+      <div class="fcard">
+        <svg viewBox="0 0 24 24"><path d="M3 6h18M3 6v12a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V6M3 6l2-3h14l2 3"/></svg>
+        <h3>Repository Intelligence</h3>
+        <p>Detects stack, frameworks, database, and deployment shape before anything else runs.</p>
+      </div>
+      <div class="fcard">
+        <svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M7 6h10M6.5 8l4.5 8M17.5 8L13 16"/></svg>
+        <h3>Architecture Graph</h3>
+        <p>A real dependency graph of modules, imports, and routes — explorable, not just described.</p>
+      </div>
+      <div class="fcard">
+        <svg viewBox="0 0 24 24"><path d="M9 5 3 12l6 7M15 5l6 7-6 7"/><path d="M13 4l-2 16" stroke-dasharray="1 3"/></svg>
+        <h3>Code Quality Engine</h3>
+        <p>Circular imports via strongly-connected components, oversized functions, naming drift — scored.</p>
+      </div>
+      <div class="fcard">
+        <svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3z"/></svg>
+        <h3>Security Scanner</h3>
+        <p>Deterministic checks for hardcoded secrets, dangerous exec, and unsafe deserialization.</p>
+      </div>
+      <div class="fcard">
+        <svg viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10M6 9c0 4 5 3 10 3"/></svg>
+        <h3>Git Intelligence</h3>
+        <p>File churn, bug-fix hotspots, ownership, and co-change pairs — pulled straight from git log.</p>
+      </div>
+      <div class="fcard">
+        <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 12h6M9 16h6M9 8h3"/></svg>
+        <h3>Documentation Generator</h3>
+        <p>Everything above, assembled into one Markdown report with a live Mermaid dependency diagram.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sheet" id="interface">
+  <div class="wrap">
+    <div class="sheet-head reveal">
+      <div>
+        <p class="sheet-tag">Sheet 03 — Interface</p>
+        <h2>Paste a URL. Watch it work.</h2>
+      </div>
+      <p class="sheet-sub">A job survives a page refresh mid-analysis. Dark mode and a fully responsive mobile layout ship too.</p>
+    </div>
+
+    <div class="plates reveal">
+      <div class="plate">
+        <img src="screenshots/report-light.png" alt="Atlas rendering a generated Markdown report, with score cards, a directory guide, and a dependency diagram." loading="lazy" />
+        <div class="plate-cap"><span>Generated report</span><span>report-light.png</span></div>
+      </div>
+      <div class="plates-side">
+        <div class="plate">
+          <img src="screenshots/idle.png" alt="The Atlas idle screen with a single field to paste a GitHub URL." loading="lazy" />
+          <div class="plate-cap"><span>Start here</span><span>idle.png</span></div>
+        </div>
+        <div class="plate">
+          <img src="screenshots/running.png" alt="Atlas showing live per-stage progress while analyzing a repository." loading="lazy" />
+          <div class="plate-cap"><span>Live progress</span><span>running.png</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sheet" id="architecture" style="padding-top:0;">
+  <div class="wrap">
+    <div class="sheet-head reveal">
+      <div>
+        <p class="sheet-tag">Sheet 04 — Architecture</p>
+        <h2>How the pieces fit</h2>
+      </div>
+      <p class="sheet-sub">A stateless FastAPI backend, a SQLite-backed job queue, and a React frontend that polls it.</p>
+    </div>
+
+    <div class="arch-flow-wrap reveal">
+    <div class="arch-flow">
+      <div class="arch-node"><b>Clone</b>cloner.py</div>
+      <div class="arch-arrow"></div>
+      <div class="arch-node"><b>Parse</b>code_parser.py</div>
+      <div class="arch-arrow"></div>
+      <div class="arch-node"><b>Graph</b>graph_builder.py</div>
+      <div class="arch-arrow"></div>
+      <div class="arch-node"><b>Quality + Security</b>2 engines</div>
+      <div class="arch-arrow"></div>
+      <div class="arch-node"><b>Git Intel</b>git_intelligence.py</div>
+      <div class="arch-arrow"></div>
+      <div class="arch-node"><b>Report</b>doc_generator.py</div>
+    </div>
+    </div>
+    <p class="arch-link"><a href="https://github.com/Justin300507/atlas/blob/main/ARCHITECTURE.md">Read the full architecture doc, including the request-flow diagram and data-flow constraints →</a></p>
+  </div>
+</section>
+
+<section class="sheet" id="proof" style="padding-top:0;">
+  <div class="wrap">
+    <div class="sheet-head reveal">
+      <div>
+        <p class="sheet-tag">Sheet 05 — Real Output</p>
+        <h2>Not mockups. Real reports, real repos.</h2>
+      </div>
+      <p class="sheet-sub">Generated by the tool itself against public repositories, nothing hand-edited.</p>
+    </div>
+
+    <div class="proof-grid reveal">
+      <a class="proof-card" href="https://github.com/Justin300507/atlas/blob/main/docs/examples/typer-report.md">
+        <div class="file">docs/examples/typer-report.md</div>
+        <h3>tiangolo/typer</h3>
+        <p>A mid-sized Python CLI framework — a real 22-module circular-dependency cluster, 89 complexity findings, and churn across 500 commits.</p>
+      </a>
+      <a class="proof-card" href="https://github.com/Justin300507/atlas/blob/main/docs/examples/express-report.md">
+        <div class="file">docs/examples/express-report.md</div>
+        <h3>expressjs/express</h3>
+        <p>A CommonJS-heavy Node.js repo — 84 routes detected via <code>require()</code>-based imports, clean architecture score.</p>
+      </a>
+    </div>
+
+    <p class="arch-link" style="margin-top:22px;"><a href="https://github.com/Justin300507/atlas/blob/main/docs/benchmarks/2026-07-23-performance-and-load-benchmark.md">See measured runtime and memory from 10K to 250K lines of code →</a></p>
+  </div>
+</section>
+
+<footer class="closing">
+  <div class="wrap">
+    <h2>Paste a repo. Get an engineering review, not a chat reply.</h2>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="https://github.com/Justin300507/atlas">View source on GitHub</a>
+      <a class="btn btn-ghost" href="https://github.com/Justin300507/atlas/blob/main/DEPLOYMENT.md">Run it locally</a>
+    </div>
+    <div class="titleblock">
+      <span>PROJECT <b>ATLAS</b></span>
+      <span>TYPE <b>Software Intelligence Platform</b></span>
+      <span>ANALYSIS <b>Deterministic — no LLM in the pipeline</b></span>
+      <span>STATUS <b>Pre-release</b></span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/landing.js"></script>
+</body>
+</html>
