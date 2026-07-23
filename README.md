@@ -1,5 +1,7 @@
 # Atlas
 
+[![Docker validate](https://github.com/Justin300507/atlas/actions/workflows/docker-validate.yml/badge.svg)](https://github.com/Justin300507/atlas/actions/workflows/docker-validate.yml)
+
 Software Intelligence Platform — paste a GitHub repo, get a full engineering
 review instead of a chatbot.
 
@@ -30,6 +32,9 @@ Python CLI framework and a CommonJS Node.js server).
 ## Running it
 
 - **Quick start**: `docker compose up --build` — see [`DEPLOYMENT.md`](DEPLOYMENT.md).
+  The compose stack (build, backend healthcheck, frontend serving) is
+  validated on every push via [`docker-validate.yml`](.github/workflows/docker-validate.yml) —
+  no local machine in dev has Docker installed, so CI is the real check.
 - **Backend only**: see [`backend/README.md`](backend/README.md). Once running,
   interactive API docs are at `http://127.0.0.1:8000/docs` (Swagger UI, auto-generated).
 - **Frontend only**: `cd frontend && npm install && npm run dev` (needs the
