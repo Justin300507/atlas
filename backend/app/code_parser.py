@@ -71,11 +71,16 @@ def _text(node, source: bytes) -> str:
     return source[node.start_byte : node.end_byte].decode("utf-8", errors="ignore")
 
 
-def _require_call_argument(node, source: bytes) -> str | None:
+def _module_call_argument(node, source: bytes) -> str | None:
+    """Return the string argument of a `require(...)` call or a dynamic
+    `import(...)` expression, or None if this call_expression is neither."""
     children = node.children
-    if not children or children[0].type != "identifier":
+    if not children:
         return None
-    if _text(children[0], source) != "require":
+    head = children[0]
+    is_require = head.type == "identifier" and _text(head, source) == "require"
+    is_dynamic_import = head.type == "import"
+    if not is_require and not is_dynamic_import:
         return None
     for child in children:
         if child.type != "arguments":
@@ -97,9 +102,9 @@ def _extract_imports(root, source: bytes, lang: str) -> list[str]:
                 if child.type == "string":
                     imports.append(_text(child, source).strip("'\""))
         elif lang in ("javascript", "typescript", "tsx") and node.type == "call_expression":
-            required = _require_call_argument(node, source)
-            if required is not None:
-                imports.append(required)
+            specifier = _module_call_argument(node, source)
+            if specifier is not None:
+                imports.append(specifier)
         for child in node.children:
             walk(child)
 

@@ -9,3 +9,8 @@ function build() {
 
 const dynamicPath = "./computed";
 const dynamic = require(dynamicPath);
+
+async function lazy() {
+  const mod = await import("./lazy-module");
+  return mod;
+}

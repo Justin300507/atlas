@@ -40,6 +40,7 @@ def test_parse_js_file_extracts_commonjs_require_calls():
     # statically, so it must not produce a bogus "dynamicPath" entry.
     assert "dynamicPath" not in symbols.imports
     assert "./computed" not in symbols.imports
+    assert "./lazy-module" in symbols.imports
 
 
 def test_parse_python_file_extracts_function_line_spans_and_branch_counts():

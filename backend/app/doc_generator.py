@@ -221,12 +221,13 @@ def _analysis_coverage() -> str:
             "- Python imports (absolute and relative)",
             "- ES Module imports (JS/TS `import` syntax)",
             "- CommonJS imports (JS/TS `require()` calls)",
+            "- Dynamic ES imports (JS/TS `import(...)` expressions)",
             "- Git history (commit churn, ownership, co-change)",
             "- Repository structure and stack detection",
             "",
             "**Limitations:**",
-            "- Dynamic imports (e.g. `import()` expressions, `require()` calls with "
-            "a non-literal argument) can't be resolved statically and are skipped.",
+            "- Imports whose target isn't a string literal (e.g. "
+            "`require(somePathVariable)`) can't be resolved statically and are skipped.",
             "- Quality and architecture scores are heuristic engineering signals, "
             "not guarantees of correctness or safety.",
         ]
