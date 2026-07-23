@@ -177,8 +177,18 @@ dropped poll isn't the same as the job itself failing.
 - **`main.py`**: `POST /jobs` + `GET /jobs/{id}` API tests polling a job through to
   completion (mocked clones, no live network — same pattern as every existing API
   test), plus a 404-on-unknown-job-id test and a 400-on-invalid-URL test.
-- **`/documentation`'s existing tests must still pass unmodified** — this phase's
-  backend refactor changes internal structure, not behavior.
+- **`/documentation`'s (and `/analyze`'s) *behavior* is unchanged, but three
+  existing tests need mechanical updates, not because behavior changed but because
+  Python resolves a monkeypatched name in the module that actually calls it: moving
+  `_iter_source_files`/`_MAX_FILE_SIZE_BYTES`/`_MAX_FILES_PER_REPO` and the
+  clone-and-analyze pipeline into `report_pipeline.py` means tests that patched
+  `app.main.shallow_clone`, `app.main.clone_with_history`, or
+  `app.main._MAX_FILES_PER_REPO` to intercept `/documentation`'s (or the moved
+  constants') behavior must patch `app.report_pipeline.*` instead — `/analyze`'s own
+  handler stays in `main.py` untouched, so its monkeypatches are unaffected. Exactly
+  three tests need this: `test_analyze_skips_oversized_file_and_keeps_others`
+  (import path only), `test_analyze_stops_walking_after_max_file_count` (monkeypatch
+  path), `test_documentation_returns_markdown_report` (both monkeypatch paths).
 - **Frontend**: Vitest + React Testing Library covering the four UI states with a
   mocked `fetch` (Idle → submit → Running with a mocked in-flight job → Done
   rendering known markdown; and a separate Error-state test). No live backend or
