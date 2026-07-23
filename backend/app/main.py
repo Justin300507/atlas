@@ -76,7 +76,7 @@ def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
                     continue
                 if symbols is not None:
                     files.append(symbols)
-            graph = build_graph(files)
+            graph = build_graph(files, repo_root=repo_path)
             quality = analyze_quality(files, graph)
             return AnalyzeResponse(
                 stack=stack,
@@ -105,7 +105,7 @@ def documentation(request: AnalyzeRequest) -> DocumentationResponse:
                     continue
                 if symbols is not None:
                     files.append(symbols)
-            graph = build_graph(files)
+            graph = build_graph(files, repo_root=repo_path)
             quality = analyze_quality(files, graph)
 
         with clone_with_history(request.repo_url, depth=_GIT_HISTORY_COMMITS + 1) as history_path:
