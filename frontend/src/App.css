@@ -1,0 +1,47 @@
+.app {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  font-family: system-ui, sans-serif;
+}
+
+form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+input[type="text"] {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.error {
+  color: #b00020;
+}
+
+.progress ul {
+  list-style: none;
+  padding: 0;
+}
+
+.progress li {
+  padding: 0.25rem 0;
+  color: #888;
+}
+
+.progress li.done {
+  color: #111;
+  font-weight: 600;
+}
+
+.report pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
