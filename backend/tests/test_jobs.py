@@ -1,4 +1,17 @@
-from app.jobs import count_active_jobs, create_job, get_job, update_job
+import sqlite3
+from datetime import datetime, timedelta, timezone
+
+from app.jobs import cleanup_stale_jobs, count_active_jobs, create_job, get_job, update_job
+
+
+def _backdate_job(job_id: str, db_path, hours_ago: float) -> None:
+    created_at = (datetime.now(timezone.utc) - timedelta(hours=hours_ago)).isoformat()
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("UPDATE jobs SET created_at = ? WHERE id = ?", (created_at, job_id))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def test_create_job_returns_queued_record(tmp_path):
@@ -79,3 +92,46 @@ def test_count_active_jobs_counts_queued_and_running_but_not_done_or_error(tmp_p
 
     assert count_active_jobs(db_path=db_path) == 2
     assert queued  # keep referenced for clarity of intent
+
+
+def test_cleanup_stale_jobs_removes_only_finished_jobs_older_than_max_age(tmp_path):
+    db_path = tmp_path / "jobs.db"
+
+    old_job = create_job("https://github.com/example/old", db_path=db_path)
+    update_job(old_job, status="done", markdown="# report", db_path=db_path)
+    recent_job = create_job("https://github.com/example/recent", db_path=db_path)
+    update_job(recent_job, status="done", markdown="# report", db_path=db_path)
+    _backdate_job(old_job, db_path, hours_ago=48)
+    _backdate_job(recent_job, db_path, hours_ago=1)
+
+    removed = cleanup_stale_jobs(max_age_hours=24, db_path=db_path)
+
+    assert removed == 1
+    assert get_job(old_job, db_path=db_path) is None
+    assert get_job(recent_job, db_path=db_path) is not None
+
+
+def test_cleanup_stale_jobs_never_removes_a_running_or_queued_job(tmp_path):
+    db_path = tmp_path / "jobs.db"
+
+    stuck_running = create_job("https://github.com/example/stuck-running", db_path=db_path)
+    update_job(stuck_running, status="running", db_path=db_path)
+    _backdate_job(stuck_running, db_path, hours_ago=48)
+
+    stuck_queued = create_job("https://github.com/example/stuck-queued", db_path=db_path)
+    _backdate_job(stuck_queued, db_path, hours_ago=48)
+
+    removed = cleanup_stale_jobs(max_age_hours=24, db_path=db_path)
+
+    assert removed == 0
+    assert get_job(stuck_running, db_path=db_path) is not None
+    assert get_job(stuck_queued, db_path=db_path) is not None
+
+
+def test_cleanup_stale_jobs_is_a_noop_when_nothing_is_old(tmp_path):
+    db_path = tmp_path / "jobs.db"
+    create_job("https://github.com/example/example", db_path=db_path)
+
+    removed = cleanup_stale_jobs(max_age_hours=24, db_path=db_path)
+
+    assert removed == 0

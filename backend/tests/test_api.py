@@ -345,6 +345,51 @@ def test_job_runs_synchronously_via_submit_override_and_reaches_done(monkeypatch
     assert "## Executive Summary" in body["markdown"]
 
 
+def test_analyze_rejects_oversized_repo_url_payload():
+    resp = client.post("/analyze", json={"repo_url": "x" * 301})
+    assert resp.status_code == 422
+
+
+def test_rate_limit_returns_429_with_retry_after_once_exceeded(monkeypatch, tmp_path):
+    from app.rate_limiter import RateLimiter
+
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url: None)
+    monkeypatch.setattr("app.main._RATE_LIMITER", RateLimiter(max_requests=2, window_seconds=60))
+
+    for _ in range(2):
+        resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
+        assert resp.status_code == 202
+
+    resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
+    assert resp.status_code == 429
+    assert resp.headers["retry-after"] == "60"
+
+
+def test_rate_limit_key_ignores_x_forwarded_for_header(monkeypatch, tmp_path):
+    from app.rate_limiter import RateLimiter
+
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url: None)
+    monkeypatch.setattr("app.main._RATE_LIMITER", RateLimiter(max_requests=1, window_seconds=60))
+
+    resp_a = client.post(
+        "/jobs",
+        json={"repo_url": "https://github.com/example/example"},
+        headers={"X-Forwarded-For": "203.0.113.5"},
+    )
+    assert resp_a.status_code == 202
+
+    # A spoofed X-Forwarded-For must not grant a second client identity --
+    # the key is the actual transport-level client, which is unchanged.
+    resp_b = client.post(
+        "/jobs",
+        json={"repo_url": "https://github.com/example/example"},
+        headers={"X-Forwarded-For": "203.0.113.6"},
+    )
+    assert resp_b.status_code == 429
+
+
 def test_job_records_error_on_clone_failure(monkeypatch, tmp_path):
     from app.cloner import CloneError
 

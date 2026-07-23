@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class StackReport(BaseModel):
@@ -56,7 +56,7 @@ class SecurityReport(BaseModel):
 
 
 class AnalyzeRequest(BaseModel):
-    repo_url: str
+    repo_url: str = Field(max_length=300)
 
 
 class AnalyzeResponse(BaseModel):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import jobs
@@ -24,6 +24,7 @@ from .models import (
     GitIntelligenceReport,
     GraphResponse,
 )
+from .rate_limiter import RateLimiter
 from .report_pipeline import (
     _GIT_HISTORY_COMMITS,
     analyze_structure,
@@ -48,13 +49,35 @@ _JOB_EXECUTOR = ThreadPoolExecutor(max_workers=4)
 # where the requests originate from.
 _MAX_ACTIVE_JOBS = 8
 
+# Global concurrency cap above bounds total simultaneous work but not how
+# often one client can trigger it -- this bounds a single caller's request
+# rate on the expensive (clone + analyze) endpoints, independent of that cap.
+_RATE_LIMIT_MAX_REQUESTS = 20
+_RATE_LIMIT_WINDOW_SECONDS = 60.0
+_RATE_LIMITER = RateLimiter(_RATE_LIMIT_MAX_REQUESTS, _RATE_LIMIT_WINDOW_SECONDS)
+
+_JOB_RETENTION_HOURS = 24
+
+
+def _client_key(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def rate_limit(request: Request) -> None:
+    if not _RATE_LIMITER.allow(_client_key(request)):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests from this client. Please slow down and try again shortly.",
+            headers={"Retry-After": str(int(_RATE_LIMIT_WINDOW_SECONDS))},
+        )
+
 
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/analyze", response_model=AnalyzeResponse)
+@app.post("/analyze", response_model=AnalyzeResponse, dependencies=[Depends(rate_limit)])
 def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     try:
         with shallow_clone(request.repo_url) as repo_path:
@@ -73,7 +96,7 @@ def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@app.post("/documentation", response_model=DocumentationResponse)
+@app.post("/documentation", response_model=DocumentationResponse, dependencies=[Depends(rate_limit)])
 def documentation(request: AnalyzeRequest) -> DocumentationResponse:
     try:
         return run_full_analysis(request.repo_url)
@@ -85,7 +108,7 @@ def documentation(request: AnalyzeRequest) -> DocumentationResponse:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@app.post("/git-intelligence", response_model=GitIntelligenceReport)
+@app.post("/git-intelligence", response_model=GitIntelligenceReport, dependencies=[Depends(rate_limit)])
 def git_intelligence(request: AnalyzeRequest) -> GitIntelligenceReport:
     try:
         with clone_with_history(request.repo_url, depth=_GIT_HISTORY_COMMITS + 1) as repo_path:
@@ -120,12 +143,13 @@ def _run_job(job_id: str, repo_url: str) -> None:
         jobs.update_job(job_id, status="error", error=f"Unexpected error: {exc}")
 
 
-@app.post("/jobs", status_code=202)
+@app.post("/jobs", status_code=202, dependencies=[Depends(rate_limit)])
 def create_job_endpoint(request: AnalyzeRequest) -> dict:
     try:
         validate_github_url(request.repo_url)
     except InvalidRepoUrlError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    jobs.cleanup_stale_jobs(_JOB_RETENTION_HOURS)
     if jobs.count_active_jobs() >= _MAX_ACTIVE_JOBS:
         raise HTTPException(
             status_code=429,

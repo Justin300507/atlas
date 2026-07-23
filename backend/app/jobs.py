@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "atlas_jobs.db"
@@ -111,6 +111,27 @@ def count_active_jobs(db_path: Path | None = None) -> int:
     finally:
         conn.close()
     return row[0]
+
+
+def cleanup_stale_jobs(max_age_hours: float = 24, db_path: Path | None = None) -> int:
+    resolved_path = _resolve_db_path(db_path)
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).isoformat()
+    conn = _connect(resolved_path)
+    try:
+        # Only ever delete finished jobs. A job can still be legitimately
+        # queued/running past the cutoff (there's no hard timeout on the
+        # analysis phase itself -- see the security-hardening design doc's
+        # "hard CPU timeout" section), and deleting its row out from under it
+        # would make the in-flight worker's update_job() a silent no-op and
+        # turn its eventual result into a permanent 404.
+        cursor = conn.execute(
+            "DELETE FROM jobs WHERE created_at < ? AND status IN ('done', 'error')",
+            (cutoff,),
+        )
+        conn.commit()
+        return cursor.rowcount
+    finally:
+        conn.close()
 
 
 def get_job(job_id: str, db_path: Path | None = None) -> JobRecord | None:
