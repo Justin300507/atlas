@@ -79,3 +79,7 @@ class GitIntelligenceReport(BaseModel):
     churn: list[FileChurn]
     ownership: list[FileOwnership]
     co_changes: list[CoChangePair]
+
+
+class DocumentationResponse(BaseModel):
+    markdown: str

@@ -2,6 +2,7 @@ from app.models import (
     AnalyzeRequest,
     AnalyzeResponse,
     CoChangePair,
+    DocumentationResponse,
     FileChurn,
     FileOwnership,
     GitIntelligenceReport,
@@ -84,3 +85,8 @@ def test_git_intelligence_report_serializes():
     assert data["commits_analyzed"] == 3
     assert data["churn"][0]["bug_fix_count"] == 1
     assert data["co_changes"][0]["co_change_count"] == 1
+
+
+def test_documentation_response_serializes_markdown():
+    response = DocumentationResponse(markdown="## Executive Summary\n\nhello")
+    assert "Executive Summary" in response.model_dump()["markdown"]
