@@ -104,6 +104,34 @@ def test_detects_os_system_and_eval_and_exec(tmp_path):
     assert kinds.count("dangerous_execution") == 3
 
 
+def test_does_not_flag_eval_method_call_on_a_custom_object(tmp_path):
+    # Regression test for the 2026-07-24 real-world validation finding:
+    # Django's django/template/smartif.py defines Operator.eval(), an
+    # expression-evaluator method unrelated to the builtin eval() that
+    # executes arbitrary strings -- x.eval(context) must not be flagged the
+    # same as a bare eval(...) call.
+    files = [
+        _file(
+            "smartif.py",
+            'result = lambda context, x, y: x.eval(context) or y.eval(context)\n',
+            tmp_path,
+        )
+    ]
+
+    report = scan_files(files)
+
+    assert report.issues == []
+
+
+def test_still_flags_bare_eval_at_start_of_expression(tmp_path):
+    files = [_file("risky.py", "result = (eval(user_input))\n", tmp_path)]
+
+    report = scan_files(files)
+
+    kinds = [i.kind for i in report.issues]
+    assert kinds.count("dangerous_execution") == 1
+
+
 def test_detects_js_child_process_exec(tmp_path):
     files = [
         FileSymbols(
@@ -150,6 +178,71 @@ def test_does_not_flag_yaml_load_with_safe_loader(tmp_path):
     report = scan_files(files)
 
     assert report.issues == []
+
+
+def test_hardcoded_secret_in_tests_directory_demoted_to_minor(tmp_path):
+    # Regression test for the 2026-07-24 real-world validation finding:
+    # Django's own test suite assigning dummy passwords in tests/ was
+    # flagged critical, indistinguishable from a real leaked credential.
+    files = [_file("tests/test_auth.py", 'password = "testpass123456"\n', tmp_path)]
+
+    report = scan_files(files)
+
+    assert len(report.issues) == 1
+    assert report.issues[0].severity == "minor"
+    assert "test/fixture path" in report.issues[0].message
+    assert report.issues[0].kind == "hardcoded_secret"
+
+
+def test_eval_in_test_fixtures_directory_demoted_to_minor(tmp_path):
+    # Regression test: React's compiler test fixtures under __tests__/
+    # legitimately contain eval()/exec() as the thing under test, flagged
+    # important -- indistinguishable from a real dangerous-execution risk.
+    files = [
+        FileSymbols(
+            path=str(tmp_path / "__tests__" / "fixtures" / "eval-case.js"),
+            language="javascript",
+        )
+    ]
+    (tmp_path / "__tests__" / "fixtures").mkdir(parents=True)
+    (tmp_path / "__tests__" / "fixtures" / "eval-case.js").write_text("eval(userInput);\n")
+
+    report = scan_files(files)
+
+    assert len(report.issues) == 1
+    assert report.issues[0].severity == "minor"
+
+
+def test_test_prefixed_filename_demoted_even_outside_test_directory(tmp_path):
+    files = [_file("test_config.py", 'api_key = "sk_live_1234567890abcdef"\n', tmp_path)]
+
+    report = scan_files(files)
+
+    assert report.issues[0].severity == "minor"
+
+
+def test_dotted_test_suffix_filename_demoted(tmp_path):
+    files = [
+        FileSymbols(path=str(tmp_path / "auth.spec.ts"), language="javascript"),
+    ]
+    (tmp_path / "auth.spec.ts").write_text('const password = "hunter22222";\n')
+
+    report = scan_files(files)
+
+    assert report.issues[0].severity == "minor"
+
+
+def test_regular_source_file_named_similarly_to_tests_dir_not_demoted(tmp_path):
+    # "testutils.py" at the root is not a test file by our heuristic (no
+    # test/tests/__tests__/fixtures directory segment, no test_/​_test/
+    # .test/.spec filename pattern) -- a deliberately conservative
+    # heuristic that only catches conventional naming, not anything with
+    # "test" as a substring.
+    files = [_file("testutils.py", 'password = "hunter222222"\n', tmp_path)]
+
+    report = scan_files(files)
+
+    assert report.issues[0].severity == "critical"
 
 
 def test_issue_line_numbers_are_correct(tmp_path):
