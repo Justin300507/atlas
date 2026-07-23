@@ -5,7 +5,13 @@ from pathlib import Path, PurePath
 import networkx as nx
 
 from .code_parser import FileSymbols
-from .models import FileCoverage, GitIntelligenceReport, QualityReport, SecurityReport, StackReport
+from .models import (
+    FileCoverage,
+    GitIntelligenceReport,
+    QualityReport,
+    SecurityReport,
+    StackReport,
+)
 
 _DIAGRAM_NODE_CAP = 40
 _HIGH_CHURN_LIMIT = 10
