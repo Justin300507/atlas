@@ -245,6 +245,19 @@ def test_create_job_rejects_invalid_url(monkeypatch, tmp_path):
     assert resp.status_code == 400
 
 
+def test_create_job_rejects_when_too_many_jobs_are_active(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+    monkeypatch.setattr("app.main._MAX_ACTIVE_JOBS", 2)
+    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url: None)
+
+    for _ in range(2):
+        resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
+        assert resp.status_code == 202
+
+    resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
+    assert resp.status_code == 429
+
+
 def test_get_job_returns_404_for_unknown_id(monkeypatch, tmp_path):
     monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
 

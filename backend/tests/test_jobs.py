@@ -1,4 +1,4 @@
-from app.jobs import create_job, get_job, update_job
+from app.jobs import count_active_jobs, create_job, get_job, update_job
 
 
 def test_create_job_returns_queued_record(tmp_path):
@@ -64,3 +64,18 @@ def test_jobs_isolated_across_different_db_files(tmp_path):
 
     assert get_job(job_id, db_path=db_a) is not None
     assert get_job(job_id, db_path=db_b) is None
+
+
+def test_count_active_jobs_counts_queued_and_running_but_not_done_or_error(tmp_path):
+    db_path = tmp_path / "jobs.db"
+
+    queued = create_job("https://github.com/example/a", db_path=db_path)
+    running = create_job("https://github.com/example/b", db_path=db_path)
+    update_job(running, status="running", db_path=db_path)
+    done = create_job("https://github.com/example/c", db_path=db_path)
+    update_job(done, status="done", markdown="x", db_path=db_path)
+    errored = create_job("https://github.com/example/d", db_path=db_path)
+    update_job(errored, status="error", error="x", db_path=db_path)
+
+    assert count_active_jobs(db_path=db_path) == 2
+    assert queued  # keep referenced for clarity of intent

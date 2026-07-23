@@ -44,6 +44,13 @@ app.add_middleware(
 
 _JOB_EXECUTOR = ThreadPoolExecutor(max_workers=4)
 
+# CORS is wide open (no auth, no secrets in responses) so any page can call
+# this API cross-origin, including one a user didn't intend to run a clone
+# from. This cap bounds how much clone/CPU work an unbounded burst of job
+# creation (malicious or accidental) can trigger at once, independent of
+# where the requests originate from.
+_MAX_ACTIVE_JOBS = 8
+
 
 @app.get("/health")
 def health() -> dict:
@@ -131,6 +138,11 @@ def create_job_endpoint(request: AnalyzeRequest) -> dict:
         validate_github_url(request.repo_url)
     except InvalidRepoUrlError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if jobs.count_active_jobs() >= _MAX_ACTIVE_JOBS:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many analyses are already in progress. Try again shortly.",
+        )
     job_id = jobs.create_job(request.repo_url)
     _submit_job(job_id, request.repo_url)
     return {"job_id": job_id}

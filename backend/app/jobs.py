@@ -101,6 +101,18 @@ def update_job(
         conn.close()
 
 
+def count_active_jobs(db_path: Path | None = None) -> int:
+    resolved_path = _resolve_db_path(db_path)
+    conn = _connect(resolved_path)
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM jobs WHERE status IN ('queued', 'running')"
+        ).fetchone()
+    finally:
+        conn.close()
+    return row[0]
+
+
 def get_job(job_id: str, db_path: Path | None = None) -> JobRecord | None:
     resolved_path = _resolve_db_path(db_path)
     conn = _connect(resolved_path)
