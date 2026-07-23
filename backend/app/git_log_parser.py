@@ -30,8 +30,13 @@ def parse_git_log(repo_path: Path, max_commits: int = 500) -> tuple[list[Commit]
             "log",
             f"-n{max_commits + 1}",
             "--numstat",
-            # Force UTF-8 regardless of the repo's commit-encoding config, so
-            # decoding below doesn't depend on it.
+            # Transcodes the commit message body (%s) to UTF-8 regardless of
+            # the repo's commit-encoding config. This does NOT cover author
+            # name/email (%an/%ae), which git passes through as stored,
+            # untouched by --encoding — those rely on errors="replace" below
+            # like everything else if a very old commit stored them as
+            # something other than UTF-8 (rare in practice: RFC-legal emails
+            # are overwhelmingly ASCII).
             "--encoding=UTF-8",
             f"--pretty=format:{_COMMIT_MARKER}%H{_FIELD_SEP}%ae{_FIELD_SEP}%s",
         ],

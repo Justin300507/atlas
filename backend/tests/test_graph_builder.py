@@ -189,6 +189,73 @@ def test_absolute_dotted_import_resolves_exactly(tmp_path):
     assert (main, user) in edge_triples
 
 
+def test_absolute_import_resolves_under_src_layout(tmp_path):
+    # Regression test: independent review found that pallets/flask ships as
+    # src/flask/... but its own code (and its test suite) writes absolute
+    # imports as `from flask.helpers import x`, not `from src.flask.helpers
+    # import x` — the exact repo-root-relative dotted path never matches for
+    # this extremely common Python packaging layout.
+    main = str(tmp_path / "tests" / "test_basic.py")
+    helpers = str(tmp_path / "src" / "flask" / "helpers.py")
+    files = [
+        FileSymbols(path=main, language="python", imports=["from flask.helpers import x"], defined=[], routes=[]),
+        FileSymbols(path=helpers, language="python", imports=[], defined=[], routes=[]),
+    ]
+
+    graph = build_graph(files, repo_root=tmp_path)
+    data = to_node_link(graph)
+
+    edge_triples = {(e["source"], e["target"]) for e in data["edges"]}
+    assert (main, helpers) in edge_triples
+
+
+def test_js_import_with_explicit_extension_resolves(tmp_path):
+    app = str(tmp_path / "src" / "app.js")
+    utils = str(tmp_path / "src" / "utils.js")
+    files = [
+        FileSymbols(path=app, language="javascript", imports=["./utils.js"], defined=[], routes=[]),
+        FileSymbols(path=utils, language="javascript", imports=[], defined=[], routes=[]),
+    ]
+
+    graph = build_graph(files, repo_root=tmp_path)
+    data = to_node_link(graph)
+
+    edge_triples = {(e["source"], e["target"]) for e in data["edges"]}
+    assert (app, utils) in edge_triples
+
+
+def test_js_import_resolves_parent_directory_traversal(tmp_path):
+    consumer = str(tmp_path / "src" / "components" / "Widget.jsx")
+    helper = str(tmp_path / "src" / "utils" / "helpers.js")
+    files = [
+        FileSymbols(
+            path=consumer, language="javascript", imports=["../utils/helpers"], defined=[], routes=[]
+        ),
+        FileSymbols(path=helper, language="javascript", imports=[], defined=[], routes=[]),
+    ]
+
+    graph = build_graph(files, repo_root=tmp_path)
+    data = to_node_link(graph)
+
+    edge_triples = {(e["source"], e["target"]) for e in data["edges"]}
+    assert (consumer, helper) in edge_triples
+
+
+def test_js_import_resolves_to_directory_index(tmp_path):
+    app = str(tmp_path / "src" / "App.tsx")
+    index_file = str(tmp_path / "src" / "widgets" / "index.js")
+    files = [
+        FileSymbols(path=app, language="tsx", imports=["./widgets"], defined=[], routes=[]),
+        FileSymbols(path=index_file, language="javascript", imports=[], defined=[], routes=[]),
+    ]
+
+    graph = build_graph(files, repo_root=tmp_path)
+    data = to_node_link(graph)
+
+    edge_triples = {(e["source"], e["target"]) for e in data["edges"]}
+    assert (app, index_file) in edge_triples
+
+
 def test_js_bare_specifier_does_not_resolve_to_local_file(tmp_path):
     # Same class of bug as the Python substring false-positive above: a bare
     # specifier like "react" (an npm package) must not resolve to a local
