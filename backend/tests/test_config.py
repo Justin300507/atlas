@@ -1,6 +1,8 @@
+import logging
+
 import pytest
 
-from app.config import ConfigError, resolve_cors_origins
+from app.config import ConfigError, resolve_cors_origins, resolve_log_level
 
 
 def test_defaults_to_local_dev_origins_when_unset():
@@ -71,6 +73,23 @@ def test_rejects_origin_with_a_trailing_slash():
         resolve_cors_origins(
             {"ATLAS_ENV": "production", "ATLAS_ALLOWED_ORIGINS": "https://atlas.example.com/"}
         )
+
+
+def test_log_level_defaults_to_info():
+    assert resolve_log_level({}) == logging.INFO
+
+
+def test_log_level_honors_an_explicit_value():
+    assert resolve_log_level({"ATLAS_LOG_LEVEL": "DEBUG"}) == logging.DEBUG
+
+
+def test_log_level_is_case_insensitive():
+    assert resolve_log_level({"ATLAS_LOG_LEVEL": "warning"}) == logging.WARNING
+
+
+def test_log_level_rejects_unknown_value():
+    with pytest.raises(ConfigError):
+        resolve_log_level({"ATLAS_LOG_LEVEL": "VERBOSE"})
 
 
 def test_rejects_malformed_origin_missing_scheme():

@@ -1,7 +1,13 @@
+import os
+import subprocess
 import sqlite3
+import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from app.jobs import cleanup_stale_jobs, count_active_jobs, create_job, get_job, update_job
+
+BACKEND_DIR = Path(__file__).parent.parent
 
 
 def _backdate_job(job_id: str, db_path, hours_ago: float) -> None:
@@ -69,6 +75,14 @@ def test_update_job_can_record_an_error(tmp_path):
     assert record.error == "Repository clone timed out"
 
 
+def test_create_job_creates_missing_parent_directories(tmp_path):
+    db_path = tmp_path / "nested" / "does" / "not" / "exist" / "jobs.db"
+
+    job_id = create_job("https://github.com/example/example", db_path=db_path)
+
+    assert get_job(job_id, db_path=db_path) is not None
+
+
 def test_jobs_isolated_across_different_db_files(tmp_path):
     db_a = tmp_path / "a.db"
     db_b = tmp_path / "b.db"
@@ -126,6 +140,27 @@ def test_cleanup_stale_jobs_never_removes_a_running_or_queued_job(tmp_path):
     assert removed == 0
     assert get_job(stuck_running, db_path=db_path) is not None
     assert get_job(stuck_queued, db_path=db_path) is not None
+
+
+def test_atlas_jobs_db_path_env_var_overrides_the_default(tmp_path):
+    # DEFAULT_DB_PATH is computed once at module import, so proving the env
+    # var actually takes effect needs a fresh process, not a monkeypatch of
+    # an already-imported module attribute.
+    custom_path = tmp_path / "custom" / "jobs.db"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from app.jobs import DEFAULT_DB_PATH\nprint(DEFAULT_DB_PATH)\n",
+        ],
+        cwd=BACKEND_DIR,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "ATLAS_JOBS_DB_PATH": str(custom_path)},
+        check=True,
+    )
+
+    assert str(custom_path) in result.stdout
 
 
 def test_cleanup_stale_jobs_is_a_noop_when_nothing_is_old(tmp_path):

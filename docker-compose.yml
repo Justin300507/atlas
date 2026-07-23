@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Change these for a real deployment -- see DEPLOYMENT.md.
+      ATLAS_ENV: development
+      ATLAS_ALLOWED_ORIGINS: http://localhost:5173
+      ATLAS_LOG_LEVEL: INFO
+      ATLAS_JOBS_DB_PATH: /app/data/atlas_jobs.db
+    volumes:
+      # Persists atlas_jobs.db (job history/status) across container
+      # restarts. Mounted at /app/data specifically, not /app -- mounting
+      # the whole working directory would shadow the app/ package copied
+      # into the image and break the container entirely.
+      - atlas-jobs-data:/app/data
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the static bundle at build time -- see frontend/Dockerfile.
+        VITE_API_BASE: http://localhost:8000
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  atlas-jobs-data:

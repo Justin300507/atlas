@@ -3,20 +3,43 @@
 AI Engineering Intelligence Platform — paste a GitHub repo, get a full engineering
 review instead of a chatbot.
 
-Atlas is being built in phases. Phase 1 (this repo's current state) is **Repository
-Intelligence + Architecture Graph**: given a public GitHub URL, Atlas clones it,
-detects its tech stack, and builds a module/import/route dependency graph, served as
-JSON from a FastAPI backend.
+Given a public GitHub URL, Atlas clones it and produces:
 
-See `docs/superpowers/specs/` for design docs and `docs/superpowers/plans/` for
-implementation plans.
+- **Repository Intelligence** — stack/language/framework/deployment detection.
+- **Architecture Graph** — a module/import/route dependency graph.
+- **Code Quality Engine** — circular imports, long/complex functions, naming
+  issues, rolled into maintainability/architecture scores.
+- **Security Scanner** — deterministic checks for hardcoded secrets, dangerous
+  execution, and unsafe deserialization.
+- **Git Intelligence** — file churn, bug-fix hotspots, ownership, and
+  co-change patterns from commit history.
+- **Documentation Generator** — a single Markdown report combining all of the
+  above, with a Mermaid dependency diagram.
 
-## Phase 1: Repository Intelligence
+All deterministic, static analysis — no LLM calls in the pipeline itself.
 
-See [`backend/README.md`](backend/README.md) to run it locally.
+## Running it
 
-## Roadmap
+- **Quick start**: `docker compose up --build` — see [`DEPLOYMENT.md`](DEPLOYMENT.md).
+- **Backend only**: see [`backend/README.md`](backend/README.md).
+- **Frontend only**: `cd frontend && npm install && npm run dev` (needs the
+  backend running; see `frontend/.env`/`VITE_API_BASE`).
 
-Later phases (not yet built): Code Quality Engine, AI Architect, Security Scanner,
-Technical Debt Analyzer, Documentation Generator, Git Intelligence, Performance
-Analyzer, AI Mentor, and a frontend UI.
+The frontend is a paste-a-URL flow: submit a repo, watch per-stage progress,
+get back the rendered report. It survives a page refresh mid-analysis.
+
+## Project layout
+
+- `backend/` — FastAPI app (`app/`), pytest suite (`tests/`).
+- `frontend/` — React + Vite + TypeScript.
+- `docs/superpowers/specs/` — design docs, one per phase/feature.
+- `docs/superpowers/plans/` — implementation plans for earlier phases.
+- `DEPLOYMENT.md` — environment variables, docker-compose, production checklist.
+
+## Not yet built
+
+AI Architect (natural-language Q&A grounded in the dependency graph),
+Technical Debt Analyzer, Performance Analyzer, AI Mentor. See
+`docs/superpowers/specs/` for the design docs behind everything that *is*
+built, including known limitations (e.g. the CORS/rate-limiting posture
+documented in the production-security-hardening and CORS-hardening specs).

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 from typing import Mapping
@@ -60,3 +61,15 @@ def resolve_cors_origins(env: Mapping[str, str] | None = None) -> list[str]:
         _validate_origins(configured)
         return configured
     return list(_DEFAULT_DEV_ORIGINS)
+
+
+def resolve_log_level(env: Mapping[str, str] | None = None) -> int:
+    env = os.environ if env is None else env
+    raw = env.get("ATLAS_LOG_LEVEL", "INFO").strip().upper()
+    level = logging.getLevelName(raw)
+    if not isinstance(level, int):
+        raise ConfigError(
+            f"Unknown ATLAS_LOG_LEVEL={raw!r}; expected one of DEBUG, INFO, "
+            "WARNING, ERROR, CRITICAL."
+        )
+    return level

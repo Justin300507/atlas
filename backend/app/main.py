@@ -8,7 +8,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import jobs
-from .config import resolve_cors_origins
+from .config import resolve_cors_origins, resolve_log_level
 from .cloner import (
     CloneError,
     InvalidRepoUrlError,
@@ -34,6 +34,10 @@ from .report_pipeline import (
 )
 from .timing import StageTimer
 
+logging.basicConfig(
+    level=resolve_log_level(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Atlas Repository Intelligence")

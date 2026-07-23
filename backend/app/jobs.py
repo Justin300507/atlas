@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "atlas_jobs.db"
+# ATLAS_JOBS_DB_PATH lets a deployment point this at a mounted volume (see
+# docker-compose.yml) without colliding with the app package directory that
+# the default path is otherwise computed relative to.
+DEFAULT_DB_PATH = Path(
+    os.environ.get("ATLAS_JOBS_DB_PATH")
+    or Path(__file__).resolve().parent.parent / "atlas_jobs.db"
+)
 
 _CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -39,6 +46,7 @@ def _resolve_db_path(db_path: Path | None) -> Path:
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.execute(_CREATE_TABLE_SQL)
     return conn
