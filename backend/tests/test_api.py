@@ -79,7 +79,7 @@ def test_analyze_skips_unparseable_file_and_continues(monkeypatch, tmp_path):
 
 
 def test_analyze_skips_oversized_file_and_keeps_others(monkeypatch, tmp_path):
-    from app.main import _MAX_FILE_SIZE_BYTES
+    from app.report_pipeline import _MAX_FILE_SIZE_BYTES
 
     good_file = tmp_path / "good.py"
     good_file.write_text("import os\n\n\ndef ok():\n    pass\n")
@@ -106,7 +106,7 @@ def test_analyze_stops_walking_after_max_file_count(monkeypatch, tmp_path):
     for i in range(5):
         (tmp_path / f"mod_{i}.py").write_text(f"x = {i}\n")
 
-    monkeypatch.setattr("app.main._MAX_FILES_PER_REPO", 2)
+    monkeypatch.setattr("app.report_pipeline._MAX_FILES_PER_REPO", 2)
 
     @contextmanager
     def fake_clone(url, timeout=60):
@@ -205,8 +205,8 @@ def test_documentation_returns_markdown_report(tmp_path, monkeypatch):
     def fake_clone_with_history(url, depth=500, timeout=120):
         yield history_repo
 
-    monkeypatch.setattr("app.main.shallow_clone", fake_shallow_clone)
-    monkeypatch.setattr("app.main.clone_with_history", fake_clone_with_history)
+    monkeypatch.setattr("app.report_pipeline.shallow_clone", fake_shallow_clone)
+    monkeypatch.setattr("app.report_pipeline.clone_with_history", fake_clone_with_history)
 
     resp = client.post("/documentation", json={"repo_url": "https://github.com/example/example"})
     assert resp.status_code == 200
