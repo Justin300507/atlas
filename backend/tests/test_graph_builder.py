@@ -92,6 +92,24 @@ def test_build_graph_resolves_import_to_tsx_and_jsx_targets():
     assert ("src/App.tsx", "src/components/Widget.jsx", "import") in edge_triples
 
 
+def test_commonjs_require_import_resolves_same_as_es_import(tmp_path):
+    # code_parser puts require() specifiers into the same FileSymbols.imports
+    # list as ES import specifiers — graph_builder needs no changes to
+    # resolve them, since it already treats every entry uniformly.
+    app = str(tmp_path / "src" / "app.js")
+    router = str(tmp_path / "src" / "router.js")
+    files = [
+        FileSymbols(path=app, language="javascript", imports=["./router"], defined=[], routes=[]),
+        FileSymbols(path=router, language="javascript", imports=[], defined=[], routes=[]),
+    ]
+
+    graph = build_graph(files, repo_root=tmp_path)
+    data = to_node_link(graph)
+
+    edge_triples = {(e["source"], e["target"]) for e in data["edges"]}
+    assert (app, router) in edge_triples
+
+
 def test_import_resolution_does_not_false_positive_on_substring_match(tmp_path):
     # Regression test: a real-world validation run against pallets/flask and
     # tiangolo/typer found that `import re` / `import os` were resolving to

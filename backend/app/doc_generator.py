@@ -220,12 +220,13 @@ def _analysis_coverage() -> str:
             "**Supported:**",
             "- Python imports (absolute and relative)",
             "- ES Module imports (JS/TS `import` syntax)",
+            "- CommonJS imports (JS/TS `require()` calls)",
             "- Git history (commit churn, ownership, co-change)",
             "- Repository structure and stack detection",
             "",
             "**Limitations:**",
-            "- CommonJS (`require()`) dependency analysis is not yet supported — "
-            "JS/TS import edges are currently ES-Module-only.",
+            "- Dynamic imports (e.g. `import()` expressions, `require()` calls with "
+            "a non-literal argument) can't be resolved statically and are skipped.",
             "- Quality and architecture scores are heuristic engineering signals, "
             "not guarantees of correctness or safety.",
         ]

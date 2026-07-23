@@ -206,7 +206,7 @@ def test_analysis_coverage_footer_discloses_support_and_limitations():
     assert "## Analysis Coverage" in doc
     assert "Python imports" in doc
     assert "ES Module" in doc
-    assert "Git history" in doc
     assert "CommonJS" in doc
-    assert "not yet supported" in doc
+    assert "Git history" in doc
+    assert "can't be resolved statically" in doc
     assert "heuristic engineering signals" in doc

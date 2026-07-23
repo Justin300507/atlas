@@ -29,6 +29,19 @@ def test_parse_js_file_extracts_imports_defs_and_routes():
     assert ("GET", "/items") in symbols.routes
 
 
+def test_parse_js_file_extracts_commonjs_require_calls():
+    symbols = parse_file(FIXTURES / "commonjs" / "sample.js")
+    assert symbols is not None
+    assert "express" in symbols.imports
+    assert "./router" in symbols.imports
+    assert "./side-effect" in symbols.imports
+    assert "nested-package" in symbols.imports
+    # require(dynamicPath) has a non-literal argument — can't be resolved
+    # statically, so it must not produce a bogus "dynamicPath" entry.
+    assert "dynamicPath" not in symbols.imports
+    assert "./computed" not in symbols.imports
+
+
 def test_parse_python_file_extracts_function_line_spans_and_branch_counts():
     symbols = parse_file(FIXTURES / "function_info" / "branchy.py")
     assert symbols is not None

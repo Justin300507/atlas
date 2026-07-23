@@ -71,6 +71,21 @@ def _text(node, source: bytes) -> str:
     return source[node.start_byte : node.end_byte].decode("utf-8", errors="ignore")
 
 
+def _require_call_argument(node, source: bytes) -> str | None:
+    children = node.children
+    if not children or children[0].type != "identifier":
+        return None
+    if _text(children[0], source) != "require":
+        return None
+    for child in children:
+        if child.type != "arguments":
+            continue
+        for arg in child.children:
+            if arg.type == "string":
+                return _text(arg, source).strip("'\"")
+    return None
+
+
 def _extract_imports(root, source: bytes, lang: str) -> list[str]:
     imports: list[str] = []
 
@@ -81,6 +96,10 @@ def _extract_imports(root, source: bytes, lang: str) -> list[str]:
             for child in node.children:
                 if child.type == "string":
                     imports.append(_text(child, source).strip("'\""))
+        elif lang in ("javascript", "typescript", "tsx") and node.type == "call_expression":
+            required = _require_call_argument(node, source)
+            if required is not None:
+                imports.append(required)
         for child in node.children:
             walk(child)
 
