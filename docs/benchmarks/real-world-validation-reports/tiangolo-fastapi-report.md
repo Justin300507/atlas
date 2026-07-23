@@ -1478,13 +1478,9 @@ _...and 322 additional findings._
 
 ## Security Findings
 
-- **critical** `tests/test_filter_pydantic_sub_model_pv2.py:34` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/test_tutorial/test_security/test_tutorial004.py:167` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/test_tutorial/test_security/test_tutorial005.py:193` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **important** `docs_src/sql_databases/tutorial001_an_py310.py:54` dangerous_execution: exec() on untrusted input can execute arbitrary code
-- **important** `docs_src/sql_databases/tutorial001_py310.py:50` dangerous_execution: exec() on untrusted input can execute arbitrary code
-- **important** `docs_src/sql_databases/tutorial002_an_py310.py:71` dangerous_execution: exec() on untrusted input can execute arbitrary code
-- **important** `docs_src/sql_databases/tutorial002_py310.py:68` dangerous_execution: exec() on untrusted input can execute arbitrary code
+- **minor** `tests/test_filter_pydantic_sub_model_pv2.py:34` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value) (in a test/fixture path — lower confidence)
+- **minor** `tests/test_tutorial/test_security/test_tutorial004.py:167` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value) (in a test/fixture path — lower confidence)
+- **minor** `tests/test_tutorial/test_security/test_tutorial005.py:193` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value) (in a test/fixture path — lower confidence)
 
 ## Recent High-Churn Components
 

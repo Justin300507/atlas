@@ -6,34 +6,34 @@
 - Auth: Not detected
 - Deployment: Not detected
 - Architecture: Not detected
-- Files analyzed: 1511
-- Overall quality score: 55/100 (maintainability 94, architecture 16)
+- Files analyzed: 3038
+- Overall quality score: 56/100 (maintainability 94, architecture 18)
 - Commits analyzed: 500 (history truncated)
 
 ## Architecture Overview
 
-- Modules: 1511
-- Import edges: 4989
+- Modules: 3038
+- Import edges: 8787
 - Routes: 0
 
 Most depended-upon modules:
-- __init__.py (318 importers)
-- __init__.py (242 importers)
-- exceptions.py (221 importers)
-- __init__.py (205 importers)
-- functional.py (133 importers)
-- __init__.py (114 importers)
-- __init__.py (109 importers)
-- __init__.py (109 importers)
-- __init__.py (101 importers)
-- __init__.py (98 importers)
+- __init__.py (795 importers)
+- __init__.py (777 importers)
+- exceptions.py (349 importers)
+- __init__.py (247 importers)
+- __init__.py (219 importers)
+- __init__.py (219 importers)
+- utils.py (212 importers)
+- functional.py (162 importers)
+- __init__.py (160 importers)
+- __init__.py (155 importers)
 
 ## Directory Guide
 
 | Directory | Files |
 |---|---|
+| tests | 2017 |
 | django | 994 |
-| tests | 490 |
 | js_tests | 11 |
 | scripts | 11 |
 | docs | 4 |
@@ -47,181 +47,128 @@ No routes detected.
 
 ```mermaid
 graph TD
-    n14["__init__.py"] --> n34["version.py"]
-    n14["__init__.py"] --> n9["__init__.py"]
-    n14["__init__.py"] --> n3["__init__.py"]
-    n14["__init__.py"] --> n7["__init__.py"]
-    n3["__init__.py"] --> n2["exceptions.py"]
-    n3["__init__.py"] --> n25["deprecation.py"]
-    n3["__init__.py"] --> n4["functional.py"]
-    n3["__init__.py"] --> n7["__init__.py"]
-    n0["__init__.py"] --> n12["__init__.py"]
-    n38["signals.py"] --> n9["__init__.py"]
-    n38["signals.py"] --> n3["__init__.py"]
-    n38["signals.py"] --> n2["exceptions.py"]
-    n38["signals.py"] --> n0["__init__.py"]
-    n38["signals.py"] --> n13["__init__.py"]
-    n38["signals.py"] --> n4["functional.py"]
-    n38["signals.py"] --> n31["__init__.py"]
-    n38["signals.py"] --> n6["__init__.py"]
-    n38["signals.py"] --> n22["__init__.py"]
-    n38["signals.py"] --> n12["__init__.py"]
-    n38["signals.py"] --> n7["__init__.py"]
-    n38["signals.py"] --> n16["__init__.py"]
-    n39["testcases.py"] --> n9["__init__.py"]
-    n39["testcases.py"] --> n3["__init__.py"]
-    n39["testcases.py"] --> n12["__init__.py"]
-    n39["testcases.py"] --> n2["exceptions.py"]
-    n39["testcases.py"] --> n31["__init__.py"]
-    n39["testcases.py"] --> n0["__init__.py"]
-    n39["testcases.py"] --> n8["__init__.py"]
-    n39["testcases.py"] --> n38["signals.py"]
-    n39["testcases.py"] --> n10["utils.py"]
-    n39["testcases.py"] --> n4["functional.py"]
-    n10["utils.py"] --> n9["__init__.py"]
-    n10["utils.py"] --> n3["__init__.py"]
-    n10["utils.py"] --> n12["__init__.py"]
-    n10["utils.py"] --> n2["exceptions.py"]
-    n10["utils.py"] --> n0["__init__.py"]
-    n10["utils.py"] --> n22["__init__.py"]
-    n10["utils.py"] --> n38["signals.py"]
-    n10["utils.py"] --> n7["__init__.py"]
-    n10["utils.py"] --> n6["__init__.py"]
-    n10["utils.py"] --> n34["version.py"]
-    n10["utils.py"] --> n1["__init__.py"]
-    n1["__init__.py"] --> n39["testcases.py"]
-    n1["__init__.py"] --> n10["utils.py"]
-    n26["encoding.py"] --> n4["functional.py"]
-    n28["html.py"] --> n3["__init__.py"]
-    n28["html.py"] --> n2["exceptions.py"]
-    n28["html.py"] --> n25["deprecation.py"]
-    n28["html.py"] --> n4["functional.py"]
-    n28["html.py"] --> n36["http.py"]
-    n28["html.py"] --> n24["regex_helper.py"]
-    n36["http.py"] --> n24["regex_helper.py"]
-    n29["module_loading.py"] --> n9["__init__.py"]
-    n24["regex_helper.py"] --> n4["functional.py"]
-    n34["version.py"] --> n24["regex_helper.py"]
-    n34["version.py"] --> n14["__init__.py"]
-    n15["options.py"] --> n14["__init__.py"]
-    n15["options.py"] --> n9["__init__.py"]
-    n15["options.py"] --> n3["__init__.py"]
-    n15["options.py"] --> n21["__init__.py"]
-    n15["options.py"] --> n35["utils.py"]
-    n15["options.py"] --> n16["__init__.py"]
-    n15["options.py"] --> n2["exceptions.py"]
-    n15["options.py"] --> n0["__init__.py"]
-    n15["options.py"] --> n8["__init__.py"]
-    n15["options.py"] --> n7["__init__.py"]
-    n15["options.py"] --> n25["deprecation.py"]
-    n15["options.py"] --> n28["html.py"]
-    n15["options.py"] --> n36["http.py"]
-    n15["options.py"] --> n6["__init__.py"]
-    n15["options.py"] --> n17["models.py"]
-    n37["sites.py"] --> n9["__init__.py"]
-    n37["sites.py"] --> n3["__init__.py"]
-    n37["sites.py"] --> n15["options.py"]
-    n37["sites.py"] --> n16["__init__.py"]
-    n37["sites.py"] --> n2["exceptions.py"]
-    n37["sites.py"] --> n8["__init__.py"]
-    n37["sites.py"] --> n7["__init__.py"]
-    n37["sites.py"] --> n4["functional.py"]
-    n37["sites.py"] --> n29["module_loading.py"]
-    n37["sites.py"] --> n6["__init__.py"]
-    n35["utils.py"] --> n16["__init__.py"]
-    n35["utils.py"] --> n2["exceptions.py"]
-    n35["utils.py"] --> n0["__init__.py"]
-    n35["utils.py"] --> n7["__init__.py"]
-    n35["utils.py"] --> n13["__init__.py"]
-    n35["utils.py"] --> n28["html.py"]
-    n35["utils.py"] --> n24["regex_helper.py"]
-    n35["utils.py"] --> n6["__init__.py"]
-    n35["utils.py"] --> n15["options.py"]
-    n35["utils.py"] --> n20["expressions.py"]
-    n11["models.py"] --> n9["__init__.py"]
-    n11["models.py"] --> n21["__init__.py"]
-    n11["models.py"] --> n17["models.py"]
-    n11["models.py"] --> n2["exceptions.py"]
-    n11["models.py"] --> n0["__init__.py"]
-    n11["models.py"] --> n13["__init__.py"]
-    n11["models.py"] --> n6["__init__.py"]
-    n16["__init__.py"] --> n9["__init__.py"]
+    n16["__init__.py"] --> n31["version.py"]
+    n16["__init__.py"] --> n13["__init__.py"]
     n16["__init__.py"] --> n3["__init__.py"]
-    n16["__init__.py"] --> n2["exceptions.py"]
-    n16["__init__.py"] --> n29["module_loading.py"]
-    n16["__init__.py"] --> n11["models.py"]
-    n33["fields.py"] --> n17["models.py"]
-    n33["fields.py"] --> n12["__init__.py"]
-    n33["fields.py"] --> n2["exceptions.py"]
-    n33["fields.py"] --> n0["__init__.py"]
-    n33["fields.py"] --> n5["__init__.py"]
-    n33["fields.py"] --> n27["__init__.py"]
-    n33["fields.py"] --> n4["functional.py"]
-    n17["models.py"] --> n9["__init__.py"]
-    n17["models.py"] --> n0["__init__.py"]
-    n17["models.py"] --> n5["__init__.py"]
-    n17["models.py"] --> n6["__init__.py"]
-    n23["base.py"] --> n14["__init__.py"]
-    n23["base.py"] --> n12["__init__.py"]
-    n23["base.py"] --> n2["exceptions.py"]
-    n23["base.py"] --> n0["__init__.py"]
-    n23["base.py"] --> n34["version.py"]
-    n23["base.py"] --> n13["__init__.py"]
-    n23["base.py"] --> n9["__init__.py"]
-    n31["__init__.py"] --> n14["__init__.py"]
-    n31["__init__.py"] --> n9["__init__.py"]
-    n31["__init__.py"] --> n3["__init__.py"]
-    n31["__init__.py"] --> n2["exceptions.py"]
-    n31["__init__.py"] --> n23["base.py"]
-    n31["__init__.py"] --> n13["__init__.py"]
-    n20["expressions.py"] --> n2["exceptions.py"]
-    n20["expressions.py"] --> n0["__init__.py"]
-    n20["expressions.py"] --> n5["__init__.py"]
-    n20["expressions.py"] --> n4["functional.py"]
-    n20["expressions.py"] --> n19["__init__.py"]
-    n30["lookups.py"] --> n2["exceptions.py"]
-    n30["lookups.py"] --> n20["expressions.py"]
-    n30["lookups.py"] --> n27["__init__.py"]
-    n30["lookups.py"] --> n4["functional.py"]
-    n30["lookups.py"] --> n19["__init__.py"]
-    n5["__init__.py"] --> n2["exceptions.py"]
-    n5["__init__.py"] --> n20["expressions.py"]
-    n5["__init__.py"] --> n27["__init__.py"]
-    n5["__init__.py"] --> n30["lookups.py"]
-    n27["__init__.py"] --> n14["__init__.py"]
-    n27["__init__.py"] --> n9["__init__.py"]
-    n27["__init__.py"] --> n3["__init__.py"]
-    n27["__init__.py"] --> n12["__init__.py"]
-    n27["__init__.py"] --> n0["__init__.py"]
+    n16["__init__.py"] --> n6["__init__.py"]
+    n3["__init__.py"] --> n2["exceptions.py"]
+    n3["__init__.py"] --> n21["deprecation.py"]
+    n3["__init__.py"] --> n8["functional.py"]
+    n3["__init__.py"] --> n6["__init__.py"]
+    n1["__init__.py"] --> n14["__init__.py"]
+    n20["__init__.py"] --> n2["exceptions.py"]
+    n23["defaultfilters.py"] --> n11["__init__.py"]
+    n23["defaultfilters.py"] --> n35["encoding.py"]
+    n23["defaultfilters.py"] --> n36["html.py"]
+    n23["defaultfilters.py"] --> n18["safestring.py"]
+    n23["defaultfilters.py"] --> n9["__init__.py"]
+    n5["utils.py"] --> n13["__init__.py"]
+    n5["utils.py"] --> n3["__init__.py"]
+    n5["utils.py"] --> n14["__init__.py"]
+    n5["utils.py"] --> n2["exceptions.py"]
+    n5["utils.py"] --> n1["__init__.py"]
+    n5["utils.py"] --> n10["__init__.py"]
+    n5["utils.py"] --> n6["__init__.py"]
+    n5["utils.py"] --> n9["__init__.py"]
+    n5["utils.py"] --> n31["version.py"]
+    n5["utils.py"] --> n0["__init__.py"]
+    n0["__init__.py"] --> n5["utils.py"]
+    n35["encoding.py"] --> n8["functional.py"]
+    n36["html.py"] --> n3["__init__.py"]
+    n36["html.py"] --> n2["exceptions.py"]
+    n36["html.py"] --> n21["deprecation.py"]
+    n36["html.py"] --> n8["functional.py"]
+    n36["html.py"] --> n33["regex_helper.py"]
+    n36["html.py"] --> n18["safestring.py"]
+    n38["module_loading.py"] --> n13["__init__.py"]
+    n33["regex_helper.py"] --> n8["functional.py"]
+    n18["safestring.py"] --> n8["functional.py"]
+    n31["version.py"] --> n33["regex_helper.py"]
+    n31["version.py"] --> n16["__init__.py"]
+    n28["options.py"] --> n16["__init__.py"]
+    n28["options.py"] --> n13["__init__.py"]
+    n28["options.py"] --> n3["__init__.py"]
+    n28["options.py"] --> n25["__init__.py"]
+    n28["options.py"] --> n27["__init__.py"]
+    n28["options.py"] --> n2["exceptions.py"]
+    n28["options.py"] --> n1["__init__.py"]
+    n28["options.py"] --> n7["__init__.py"]
+    n28["options.py"] --> n6["__init__.py"]
+    n28["options.py"] --> n21["deprecation.py"]
+    n28["options.py"] --> n36["html.py"]
+    n28["options.py"] --> n18["safestring.py"]
+    n28["options.py"] --> n9["__init__.py"]
+    n28["options.py"] --> n22["models.py"]
+    n15["models.py"] --> n13["__init__.py"]
+    n15["models.py"] --> n25["__init__.py"]
+    n15["models.py"] --> n22["models.py"]
+    n15["models.py"] --> n2["exceptions.py"]
+    n15["models.py"] --> n1["__init__.py"]
+    n15["models.py"] --> n11["__init__.py"]
+    n15["models.py"] --> n9["__init__.py"]
     n27["__init__.py"] --> n13["__init__.py"]
-    n27["__init__.py"] --> n25["deprecation.py"]
-    n27["__init__.py"] --> n4["functional.py"]
-    n27["__init__.py"] --> n6["__init__.py"]
-    n27["__init__.py"] --> n20["expressions.py"]
-    n27["__init__.py"] --> n19["__init__.py"]
-    n6["__init__.py"] --> n4["functional.py"]
-    n6["__init__.py"] --> n24["regex_helper.py"]
-    n6["__init__.py"] --> n3["__init__.py"]
-    n32["tests.py"] --> n8["__init__.py"]
-    n32["tests.py"] --> n14["__init__.py"]
-    n32["tests.py"] --> n21["__init__.py"]
-    n32["tests.py"] --> n15["options.py"]
-    n32["tests.py"] --> n35["utils.py"]
-    n32["tests.py"] --> n16["__init__.py"]
-    n32["tests.py"] --> n11["models.py"]
-    n32["tests.py"] --> n17["models.py"]
-    n32["tests.py"] --> n12["__init__.py"]
-    n32["tests.py"] --> n18["__init__.py"]
-    n32["tests.py"] --> n1["__init__.py"]
-    n32["tests.py"] --> n10["utils.py"]
-    n32["tests.py"] --> n7["__init__.py"]
-    n32["tests.py"] --> n13["__init__.py"]
-    n32["tests.py"] --> n26["encoding.py"]
-    n32["tests.py"] --> n28["html.py"]
-    n32["tests.py"] --> n36["http.py"]
+    n27["__init__.py"] --> n3["__init__.py"]
+    n27["__init__.py"] --> n2["exceptions.py"]
+    n27["__init__.py"] --> n38["module_loading.py"]
+    n27["__init__.py"] --> n15["models.py"]
+    n32["fields.py"] --> n22["models.py"]
+    n32["fields.py"] --> n14["__init__.py"]
+    n32["fields.py"] --> n2["exceptions.py"]
+    n32["fields.py"] --> n1["__init__.py"]
+    n32["fields.py"] --> n4["__init__.py"]
+    n32["fields.py"] --> n37["__init__.py"]
+    n32["fields.py"] --> n8["functional.py"]
+    n22["models.py"] --> n13["__init__.py"]
+    n22["models.py"] --> n1["__init__.py"]
+    n22["models.py"] --> n4["__init__.py"]
+    n22["models.py"] --> n9["__init__.py"]
+    n19["base.py"] --> n16["__init__.py"]
+    n19["base.py"] --> n14["__init__.py"]
+    n19["base.py"] --> n2["exceptions.py"]
+    n19["base.py"] --> n1["__init__.py"]
+    n19["base.py"] --> n31["version.py"]
+    n19["base.py"] --> n11["__init__.py"]
+    n19["base.py"] --> n13["__init__.py"]
+    n30["__init__.py"] --> n16["__init__.py"]
+    n30["__init__.py"] --> n13["__init__.py"]
+    n30["__init__.py"] --> n3["__init__.py"]
+    n30["__init__.py"] --> n2["exceptions.py"]
+    n30["__init__.py"] --> n19["base.py"]
+    n30["__init__.py"] --> n11["__init__.py"]
+    n24["expressions.py"] --> n2["exceptions.py"]
+    n24["expressions.py"] --> n1["__init__.py"]
+    n24["expressions.py"] --> n4["__init__.py"]
+    n24["expressions.py"] --> n8["functional.py"]
+    n24["expressions.py"] --> n12["__init__.py"]
+    n39["lookups.py"] --> n2["exceptions.py"]
+    n39["lookups.py"] --> n24["expressions.py"]
+    n39["lookups.py"] --> n37["__init__.py"]
+    n39["lookups.py"] --> n8["functional.py"]
+    n39["lookups.py"] --> n12["__init__.py"]
+    n4["__init__.py"] --> n2["exceptions.py"]
+    n4["__init__.py"] --> n24["expressions.py"]
+    n4["__init__.py"] --> n37["__init__.py"]
+    n4["__init__.py"] --> n39["lookups.py"]
+    n37["__init__.py"] --> n16["__init__.py"]
+    n37["__init__.py"] --> n13["__init__.py"]
+    n37["__init__.py"] --> n3["__init__.py"]
+    n37["__init__.py"] --> n14["__init__.py"]
+    n37["__init__.py"] --> n1["__init__.py"]
+    n37["__init__.py"] --> n11["__init__.py"]
+    n37["__init__.py"] --> n21["deprecation.py"]
+    n37["__init__.py"] --> n8["functional.py"]
+    n37["__init__.py"] --> n9["__init__.py"]
+    n37["__init__.py"] --> n24["expressions.py"]
+    n37["__init__.py"] --> n12["__init__.py"]
+    n9["__init__.py"] --> n8["functional.py"]
+    n9["__init__.py"] --> n33["regex_helper.py"]
+    n9["__init__.py"] --> n3["__init__.py"]
+    n29["models.py"] --> n1["__init__.py"]
+    n17["utils.py"] --> n5["utils.py"]
+    n17["utils.py"] --> n18["safestring.py"]
 ```
 
-_(40 of 1511 modules shown, capped for readability)_
+_(40 of 3038 modules shown, capped for readability)_
 
 ## Risk Areas
 
@@ -246,32 +193,32 @@ _(40 of 1511 modules shown, capped for readability)_
 - **important** `django/template/base.py:803` high_complexity: Function 'resolve' has branch count 11 (threshold 10)
 - **important** `django/template/base.py:965` high_complexity: Function '_resolve_lookup' has branch count 15 (threshold 10)
 
-_...and 1638 additional findings._
+_...and 2561 additional findings._
 
 ## Security Findings
 
-- **critical** `scripts/pr_quality/tests/test_check_pr.py:147` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/admin_inlines/tests.py:1472` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/admin_inlines/tests.py:2240` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/admin_inlines/tests.py:2253` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/admin_inlines/tests.py:2591` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/admin_inlines/tests.py:2600` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/admin_views/test_forms.py:18` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/admin_views/test_multidb.py:54` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_admin_multidb.py:42` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_auth_backends.py:1421` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_auth_backends.py:1433` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_forms.py:56` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_forms.py:59` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_forms.py:61` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_forms.py:467` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_login.py:10` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_middleware.py:190` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_models.py:227` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_signals.py:15` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
-- **critical** `tests/auth_tests/test_signals.py:16` hardcoded_secret: Possible hardcoded secret (password/token/key assigned a literal value)
+- **important** `scripts/manage_translations.py:403` dangerous_execution: eval() on untrusted input can execute arbitrary code
+- **important** `django/template/defaulttags.py:917` dangerous_execution: eval() on untrusted input can execute arbitrary code
+- **important** `django/template/smartif.py:59` dangerous_execution: eval() on untrusted input can execute arbitrary code
+- **important** `django/template/smartif.py:86` dangerous_execution: eval() on untrusted input can execute arbitrary code
+- **important** `django/template/smartif.py:144` dangerous_execution: eval() on untrusted input can execute arbitrary code
+- **important** `django/contrib/admin/static/admin/js/vendor/xregexp/xregexp.js:3197` dangerous_execution: exec() on untrusted input can execute arbitrary code
+- **important** `django/contrib/admin/static/admin/js/vendor/xregexp/xregexp.js:3657` dangerous_execution: exec() on untrusted input can execute arbitrary code
+- **important** `django/contrib/admin/static/admin/js/vendor/xregexp/xregexp.js:4003` dangerous_execution: exec() on untrusted input can execute arbitrary code
+- **important** `django/contrib/admin/static/admin/js/vendor/xregexp/xregexp.js:4202` dangerous_execution: exec() on untrusted input can execute arbitrary code
+- **important** `django/core/cache/backends/db.py:102` unsafe_deserialization: pickle.load(s)() can execute arbitrary code from untrusted data
+- **important** `django/core/cache/backends/filebased.py:38` unsafe_deserialization: pickle.load(s)() can execute arbitrary code from untrusted data
+- **important** `django/core/cache/backends/filebased.py:71` unsafe_deserialization: pickle.load(s)() can execute arbitrary code from untrusted data
+- **important** `django/core/cache/backends/filebased.py:154` unsafe_deserialization: pickle.load(s)() can execute arbitrary code from untrusted data
+- **important** `django/core/cache/backends/locmem.py:43` unsafe_deserialization: pickle.load(s)() can execute arbitrary code from untrusted data
+- **important** `django/core/cache/backends/locmem.py:73` unsafe_deserialization: pickle.load(s)() can execute arbitrary code from untrusted data
+- **important** `django/core/cache/backends/redis.py:29` unsafe_deserialization: pickle.load(s)() can execute arbitrary code from untrusted data
+- **important** `django/core/management/commands/shell.py:89` dangerous_execution: exec() on untrusted input can execute arbitrary code
+- **important** `django/core/management/commands/shell.py:262` dangerous_execution: exec() on untrusted input can execute arbitrary code
+- **important** `django/core/management/commands/shell.py:272` dangerous_execution: exec() on untrusted input can execute arbitrary code
+- **important** `django/db/migrations/questioner.py:168` dangerous_execution: eval() on untrusted input can execute arbitrary code
 
-_...and 131 additional findings._
+_...and 150 additional findings._
 
 ## Recent High-Churn Components
 

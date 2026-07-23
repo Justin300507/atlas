@@ -357,8 +357,8 @@ _(40 of 141 modules shown, capped for readability)_
 
 ## Security Findings
 
-- **important** `test/res.redirect.js:115` dangerous_execution: eval() on untrusted input can execute arbitrary code
-- **important** `test/res.redirect.js:116` dangerous_execution: eval() on untrusted input can execute arbitrary code
+- **minor** `test/res.redirect.js:115` dangerous_execution: eval() on untrusted input can execute arbitrary code (in a test/fixture path — lower confidence)
+- **minor** `test/res.redirect.js:116` dangerous_execution: eval() on untrusted input can execute arbitrary code (in a test/fixture path — lower confidence)
 
 ## Recent High-Churn Components
 
