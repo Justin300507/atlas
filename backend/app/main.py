@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import jobs
+from .config import resolve_cors_origins
 from .cloner import (
     CloneError,
     InvalidRepoUrlError,
@@ -35,18 +36,17 @@ app = FastAPI(title="Atlas Repository Intelligence")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=resolve_cors_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 _JOB_EXECUTOR = ThreadPoolExecutor(max_workers=4)
 
-# CORS is wide open (no auth, no secrets in responses) so any page can call
-# this API cross-origin, including one a user didn't intend to run a clone
-# from. This cap bounds how much clone/CPU work an unbounded burst of job
-# creation (malicious or accidental) can trigger at once, independent of
-# where the requests originate from.
+# There's still no auth or per-user quota, and CORS is permissive by default
+# in development (see config.py). This cap bounds how much clone/CPU work an
+# unbounded burst of job creation (malicious or accidental) can trigger at
+# once, independent of where the requests originate from.
 _MAX_ACTIVE_JOBS = 8
 
 # Global concurrency cap above bounds total simultaneous work but not how

@@ -14,6 +14,29 @@ python -m venv .venv
 .venv/Scripts/python -m uvicorn app.main:app --reload
 ```
 
+## Configuration
+
+Two environment variables control CORS (see
+`docs/superpowers/specs/2026-07-23-cors-hardening-design.md` for the full
+design):
+
+- `ATLAS_ENV` — `development` (default) or `production`.
+- `ATLAS_ALLOWED_ORIGINS` — comma-separated list of allowed origins
+  (`scheme://host[:port]`, no path or trailing slash).
+
+In `development`, if `ATLAS_ALLOWED_ORIGINS` is unset, Atlas defaults to
+the frontend's local dev/preview origins (`http://localhost:5173`,
+`http://127.0.0.1:5173`, `:4173`). In `production`,
+`ATLAS_ALLOWED_ORIGINS` is **required** — the app refuses to start rather
+than fall back to an insecure default (missing, empty, or `*` all raise a
+startup error). Example for a real deployment:
+
+```bash
+export ATLAS_ENV=production
+export ATLAS_ALLOWED_ORIGINS="https://atlas.example.com"
+.venv/Scripts/python -m uvicorn app.main:app
+```
+
 ## Try it
 
 ```bash
