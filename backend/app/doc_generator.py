@@ -280,5 +280,8 @@ def _analysis_coverage() -> str:
             "can miss real issues or flag safe code that matches a risky pattern.",
             "- Quality and architecture scores are heuristic engineering signals, "
             "not guarantees of correctness or safety.",
+            "- Very large repositories are capped (5,000 source files, 2MB per "
+            "file, 50,000 total filesystem entries) — see \"Files analyzed\" "
+            "above for whether this repository hit a cap.",
         ]
     )

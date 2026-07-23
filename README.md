@@ -5,6 +5,11 @@
 Software Intelligence Platform — paste a GitHub repo, get a full engineering
 review instead of a chatbot.
 
+Atlas analyzes GitHub repositories to reveal architecture, dependency
+relationships, code quality, Git history insights, security findings, and
+engineering documentation — using deterministic software analysis, not an
+LLM guessing at your code.
+
 Given a public GitHub URL, Atlas clones it and produces:
 
 - **Repository Intelligence** — stack/language/framework/deployment detection.

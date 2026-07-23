@@ -282,6 +282,7 @@ def test_analysis_coverage_footer_discloses_support_and_limitations():
     assert "Python imports" in doc
     assert "ES Module" in doc
     assert "CommonJS" in doc
+    assert "5,000 source files" in doc
     assert "Git history" in doc
     assert "Security scanning" in doc
     assert "can't be resolved statically" in doc
