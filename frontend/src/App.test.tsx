@@ -32,6 +32,29 @@ describe("App", () => {
     });
   });
 
+  it("ignores a rapid double-click so only one job is created", async () => {
+    let resolveCreate: (value: unknown) => void;
+    const createPromise = new Promise((resolve) => {
+      resolveCreate = resolve;
+    });
+    const fetchMock = vi.fn().mockReturnValueOnce(createPromise);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App pollIntervalMs={5} />);
+    fireEvent.change(screen.getByPlaceholderText(/github.com/i), {
+      target: { value: "https://github.com/example/example" },
+    });
+    const button = screen.getByText("Analyze");
+    fireEvent.click(button);
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    resolveCreate!(jsonResponse({ job_id: "abc123" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("submits a URL and shows the running state", async () => {
     const fetchMock = vi
       .fn()

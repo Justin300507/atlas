@@ -34,6 +34,7 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
   const [view, setView] = useState<ViewState>("idle");
   const [job, setJob] = useState<JobRecord | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const pollRef = useRef<number | null>(null);
   const timerRef = useRef<number | null>(null);
@@ -52,7 +53,9 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (submitting) return; // guards against a double-click firing two jobs
     setSubmitError(null);
+    setSubmitting(true);
     try {
       const { job_id } = await createJob(repoUrl);
       setJob(null);
@@ -77,6 +80,8 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
       }, pollIntervalMs);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to start analysis");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -102,7 +107,9 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
             onChange={(e) => setRepoUrl(e.target.value)}
             required
           />
-          <button type="submit">Analyze</button>
+          <button type="submit" disabled={submitting}>
+            {submitting ? "Starting…" : "Analyze"}
+          </button>
           {submitError && <p className="error">{submitError}</p>}
         </form>
       )}
