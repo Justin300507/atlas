@@ -62,9 +62,20 @@ function CodeBlock({ className, children }: CodeProps) {
   return <code className={className}>{children}</code>;
 }
 
+function TableBlock({ children }: { children?: React.ReactNode }) {
+  return (
+    <div className="table-scroll">
+      <table>{children}</table>
+    </div>
+  );
+}
+
 export function MarkdownReport({ markdown }: { markdown: string }) {
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ code: CodeBlock }}>
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{ code: CodeBlock, table: TableBlock }}
+    >
       {markdown}
     </ReactMarkdown>
   );

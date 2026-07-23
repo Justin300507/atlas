@@ -46,3 +46,15 @@ describe("MarkdownReport mermaid concurrency", () => {
     expect(maxConcurrentCalls).toBe(1);
   });
 });
+
+describe("MarkdownReport tables", () => {
+  it("wraps a rendered table in a horizontally scrollable container", () => {
+    const markdown = "| a | b |\n| - | - |\n| 1 | 2 |\n";
+
+    const { container } = render(<MarkdownReport markdown={markdown} />);
+
+    const table = container.querySelector("table");
+    expect(table).not.toBeNull();
+    expect(table!.closest(".table-scroll")).not.toBeNull();
+  });
+});

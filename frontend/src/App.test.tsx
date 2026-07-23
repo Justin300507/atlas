@@ -31,6 +31,12 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText("Not a valid GitHub repository URL")).toBeInTheDocument();
     });
+    expect(screen.getByRole("alert")).toHaveTextContent("Not a valid GitHub repository URL");
+  });
+
+  it("exposes the repo URL input via an accessible label, not just a placeholder", () => {
+    render(<App pollIntervalMs={5} />);
+    expect(screen.getByLabelText(/github repository url/i)).toBeInTheDocument();
   });
 
   it("ignores a rapid double-click so only one job is created", async () => {
@@ -80,6 +86,10 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText("Parsing source files")).toHaveClass("done");
     });
+    // The live region's actual text content must change on each stage
+    // transition -- an aria-live region only announces real DOM mutations,
+    // not a sibling element's className toggling.
+    expect(screen.getByText(/Parsing source files \(step 2 of 7\)/)).toBeInTheDocument();
   });
 
   it("renders the report once the job is done", async () => {

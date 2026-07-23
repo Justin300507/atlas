@@ -189,7 +189,11 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
 
       {view === "idle" && (
         <form onSubmit={handleSubmit}>
+          <label htmlFor="repo-url" className="sr-only">
+            GitHub repository URL
+          </label>
           <input
+            id="repo-url"
             type="text"
             placeholder="https://github.com/owner/repo"
             value={repoUrl}
@@ -199,13 +203,25 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
           <button type="submit" disabled={submitting}>
             {submitting ? "Starting…" : "Analyze"}
           </button>
-          {submitError && <p className="error">{submitError}</p>}
+          {submitError && (
+            <p className="error" role="alert">
+              {submitError}
+            </p>
+          )}
         </form>
       )}
 
       {view === "running" && (
-        <div className="progress">
+        <div className="progress" aria-busy="true">
           <p>{elapsedSeconds}s elapsed</p>
+          {/* Visually hidden but real text content, so a stage change is an
+              actual DOM mutation an aria-live region will announce -- toggling
+              a sibling <li>'s className alone wouldn't trigger anything. */}
+          <p className="sr-only" aria-live="polite">
+            {job?.stage
+              ? `${STAGE_LABELS[job.stage]} (step ${currentStageIndex + 1} of ${STAGES.length})`
+              : "Starting analysis…"}
+          </p>
           <ul>
             {STAGES.map((stage, i) => (
               <li key={stage} className={i <= currentStageIndex ? "done" : ""}>
@@ -225,7 +241,9 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
 
       {view === "error" && (
         <div className="report">
-          <p className="error">{job?.error ?? "Analysis failed"}</p>
+          <p className="error" role="alert">
+            {job?.error ?? "Analysis failed"}
+          </p>
           <button onClick={reset}>Try Again</button>
         </div>
       )}
