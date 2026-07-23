@@ -39,6 +39,59 @@ def test_analyze_structure_reports_file_cap_hit(monkeypatch, tmp_path):
     assert coverage.files_analyzed == len(files) == 3
 
 
+def test_non_source_files_do_not_count_toward_the_source_file_cap(monkeypatch, tmp_path):
+    # Regression test for the real-world validation finding (2026-07-24):
+    # Django's walk hit the cap at 5,000 total files with only 1,511 of its
+    # 2,927 real .py files ever examined, because non-source files (docs,
+    # translations, fixtures) were consuming the same budget as real source.
+    monkeypatch.setattr(report_pipeline, "_MAX_FILES_PER_REPO", 3)
+    for i in range(3):
+        (tmp_path / f"mod_{i}.py").write_text(f"x = {i}\n")
+    for i in range(20):
+        (tmp_path / f"doc_{i}.md").write_text("# not source\n")
+        (tmp_path / f"data_{i}.json").write_text("{}\n")
+
+    _stack, files, _graph, _quality, _security, coverage = analyze_structure(tmp_path)
+
+    assert coverage.files_capped is False
+    assert coverage.files_analyzed == len(files) == 3
+
+
+def test_total_entries_walked_ceiling_still_caps_a_pathological_non_source_tree(monkeypatch, tmp_path):
+    # The source-only cap above removes the old blanket protection against a
+    # repo with a huge non-source tree (e.g. committed binary assets) -- this
+    # is the replacement circuit-breaker, independent of file type.
+    monkeypatch.setattr(report_pipeline, "_MAX_TOTAL_ENTRIES_WALKED", 5)
+    for i in range(20):
+        (tmp_path / f"asset_{i}.bin").write_bytes(b"\x00")
+
+    _stack, files, _graph, _quality, _security, coverage = analyze_structure(tmp_path)
+
+    assert coverage.files_capped is True
+    assert files == []
+
+
+def test_excluded_directory_contents_do_not_count_toward_entries_walked_ceiling(monkeypatch, tmp_path):
+    # Regression test caught in review (2026-07-24): the entries-walked
+    # ceiling exists specifically to guard against a huge vendored/binary
+    # tree, but node_modules is exactly such a tree and is also always
+    # excluded -- if its contents still consumed the budget before the
+    # exclusion check ran, a large committed node_modules or .git history
+    # could trip the ceiling for the wrong reason, on a repo whose real
+    # source tree is tiny and fully walkable.
+    monkeypatch.setattr(report_pipeline, "_MAX_TOTAL_ENTRIES_WALKED", 5)
+    node_modules = tmp_path / "node_modules"
+    node_modules.mkdir()
+    for i in range(20):
+        (node_modules / f"pkg_{i}.js").write_text("module.exports = {};\n")
+    (tmp_path / "app.py").write_text("x = 1\n")
+
+    _stack, files, _graph, _quality, _security, coverage = analyze_structure(tmp_path)
+
+    assert coverage.files_capped is False
+    assert len(files) == 1
+
+
 def test_analyze_structure_reports_oversized_files_skipped(monkeypatch, tmp_path):
     monkeypatch.setattr(report_pipeline, "_MAX_FILE_SIZE_BYTES", 10)
     (tmp_path / "small.py").write_text("x = 1\n")

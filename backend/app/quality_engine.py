@@ -123,6 +123,15 @@ def analyze_quality(
                     )
                 )
 
+    # Note (flagged in review, 2026-07-24): a repo where the parser
+    # legitimately extracts zero functions from every file scores 100 here
+    # by construction (0 issues / smoothing constant = 0 penalty on every
+    # term). That's correct if the repo genuinely has no functions; it would
+    # be misleading if it happened because of a parser bug silently
+    # extracting nothing from a repo that has plenty. No evidence this
+    # currently happens (Django/FastAPI/Flask/React/Express all extracted
+    # functions normally in real-world validation) -- not defending against
+    # it further without a reproduction.
     long_function_penalty = round(
         long_function_count / (total_functions + _RATE_SMOOTHING) * _LONG_FUNCTION_WEIGHT
     )

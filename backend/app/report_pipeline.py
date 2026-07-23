@@ -7,7 +7,7 @@ from typing import Callable
 import networkx as nx
 
 from .cloner import clone_with_history
-from .code_parser import FileSymbols, parse_file
+from .code_parser import FileSymbols, language_for, parse_file
 from .doc_generator import generate_documentation
 from .git_intelligence import analyze_git_history
 from .git_log_parser import parse_git_log
@@ -29,7 +29,20 @@ from .stack_detector import detect
 # memory/CPU.
 _EXCLUDED_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__", "dist", "build"}
 _MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024  # skip individual files larger than this
-_MAX_FILES_PER_REPO = 5000  # stop walking a repo after yielding this many files
+
+# _MAX_FILES_PER_REPO counts only source-file *candidates* (language_for
+# matches), not every file the walk touches -- found via real-world
+# validation (2026-07-24): counting every file let non-source clutter (docs,
+# translation files, fixtures, static assets) exhaust the budget before
+# reaching real source. Django alone lost 1,416 of its 2,927 real .py files
+# this way. _MAX_TOTAL_ENTRIES_WALKED is a separate, much higher ceiling on
+# raw filesystem entries examined regardless of type -- the original cap's
+# actual job (bounding walk cost against a truly pathological repo, e.g. a
+# huge vendored/binary tree) still needs *some* limit once the source-file
+# count alone no longer provides one. Hitting either cap means the analysis
+# is incomplete; both set files_capped.
+_MAX_FILES_PER_REPO = 5000
+_MAX_TOTAL_ENTRIES_WALKED = 50_000
 
 # The commit window analyzed for git intelligence. The clone depth is set one
 # commit deeper than what's analyzed so a truncated repo always has a spare
@@ -54,14 +67,27 @@ class _FileWalkStats:
 
 
 def _iter_source_files(repo_path: Path, stats: _FileWalkStats):
+    entries_seen = 0
     for path in repo_path.rglob("*"):
-        if stats.files_walked >= _MAX_FILES_PER_REPO:
+        # Exclusion check comes before the entries_seen budget: excluded
+        # dirs (.git, node_modules, ...) are exactly the "huge vendored
+        # tree" case _MAX_TOTAL_ENTRIES_WALKED exists to guard against, so
+        # letting their contents consume that budget before it's even
+        # checked would make a large .git history or vendored tree trip the
+        # ceiling for the wrong reason (found in review, 2026-07-24).
+        if any(part in _EXCLUDED_DIRS for part in path.parts):
+            continue
+        entries_seen += 1
+        if entries_seen > _MAX_TOTAL_ENTRIES_WALKED:
             stats.files_capped = True
             return
         if not path.is_file():
             continue
-        if any(part in _EXCLUDED_DIRS for part in path.parts):
+        if language_for(path) is None:
             continue
+        if stats.files_walked >= _MAX_FILES_PER_REPO:
+            stats.files_capped = True
+            return
         try:
             if path.stat().st_size > _MAX_FILE_SIZE_BYTES:
                 stats.files_skipped_oversized += 1
