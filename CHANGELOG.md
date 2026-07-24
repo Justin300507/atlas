@@ -5,6 +5,31 @@ Atlas doesn't tag point releases yet — this file starts at the Public
 Beta launch and groups by capability milestone, not by commit; see
 `git log` for the full history.
 
+## [Unreleased]
+
+Post-launch operations pass, same day as the Public Beta release —
+found by dogfooding and live walkthroughs, not by user reports (the
+repo had zero issues/PRs/discussions at the time this section was
+written; see the operations report for that day for the honest caveat
+on what "evidence-driven" could actually mean yet).
+
+### Fixed
+
+- Security scanner flagged its own source comments (explaining what
+  `eval()`/`exec()`/`pickle.load()` detection does) as if they were
+  live dangerous code — found by running Atlas on its own repository.
+  Full-line comments are now skipped for the execution/deserialization
+  checks (not for secret detection — a commented-out secret is still a
+  real leaked value).
+- The actual product UI's browser tab title was the unmodified Vite
+  scaffold default ("frontend"), not "Atlas" — found by loading the app
+  and looking at the tab, not just the marketing landing page.
+- Startup logs confirmed nothing about resolved configuration
+  (`ATLAS_ENV`, `ATLAS_ALLOWED_ORIGINS`, `ATLAS_LOG_LEVEL`) — an
+  operator had no way to confirm a production env var was actually read
+  short of triggering a real cross-origin request. Now logged as one
+  INFO line at startup.
+
 ## [Public Beta] - 2026-07-24
 
 First public release. Everything below is implemented and validated
