@@ -2,11 +2,21 @@
 
 ## Setup
 
+**Requires Python 3.12** — `tree-sitter-languages` doesn't publish wheels
+for every Python version, and a plain `python`/`python3` on your PATH
+may resolve to something newer that this install will silently fail
+against. Use `python3.12` (or `py -3.12` on Windows) explicitly:
+
 ```bash
 cd backend
-python -m venv .venv
+python3.12 -m venv .venv       # py -3.12 -m venv .venv on Windows
 .venv/Scripts/python -m pip install -r requirements.txt
 ```
+
+If you already created a venv with the wrong Python version, delete
+`.venv` and recreate it with the command above — see
+[`../TROUBLESHOOTING.md`](../TROUBLESHOOTING.md) if `pip install` still
+fails.
 
 ## Run
 

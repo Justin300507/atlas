@@ -9,12 +9,15 @@ first so the scope is agreed before you write code.
 
 ## Local setup
 
-**Backend** (Python 3.12+):
+**Backend** (Python 3.12 specifically, not "3.12 or newer" —
+`tree-sitter-languages` has no wheels for 3.13/3.14, so a plain
+`python`/`python3` that resolves to something newer will fail
+installing dependencies):
 
 ```bash
 cd backend
-python -m venv .venv
-.venv/Scripts/activate   # .venv/bin/activate on macOS/Linux
+python3.12 -m venv .venv   # py -3.12 -m venv .venv on Windows
+.venv/Scripts/activate     # .venv/bin/activate on macOS/Linux
 pip install -r requirements.txt -r requirements-dev.txt
 ```
 
