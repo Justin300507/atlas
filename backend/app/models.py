@@ -196,8 +196,18 @@ class SnapshotSemanticSummary(BaseModel):
     smell_count: int
 
 
+class SnapshotDebtSummary(BaseModel):
+    average_debt_score: float
+    top_debt_modules: list[str]
+
+
+class SnapshotPerformanceSummary(BaseModel):
+    finding_count: int
+    bottleneck_modules: list[str]
+
+
 class AnalysisSnapshot(BaseModel):
-    schema_version: int = 1
+    schema_version: int = 2
     repo_url: str
     generated_at: str
     overall_score: int
@@ -208,6 +218,12 @@ class AnalysisSnapshot(BaseModel):
     security: SnapshotSecuritySummary
     git: SnapshotGitSummary
     semantic: SnapshotSemanticSummary
+    # Added in schema_version 2 (v1.3) -- optional with defaults so a
+    # snapshot from before this feature still deserializes; comparison
+    # against such a snapshot just won't have debt/performance metric
+    # changes (see comparison_engine.py).
+    debt: SnapshotDebtSummary | None = None
+    performance: SnapshotPerformanceSummary | None = None
 
 
 class MetricChange(BaseModel):
@@ -250,3 +266,53 @@ class CompareRequest(BaseModel):
 class CompareResponse(BaseModel):
     markdown: str
     comparison: ComparisonReport
+
+
+# ---------------------------------------------------------------------------
+# Engineering Advisor Suite (v1.3) -- see
+# docs/superpowers/specs/2026-07-24-engineering-advisor-suite-design.md
+# ---------------------------------------------------------------------------
+
+
+class DebtModule(BaseModel):
+    file: str
+    debt_score: float
+    category: str
+    confidence: str  # "high" or "low"
+    evidence: list[str]
+
+
+class TechnicalDebtReport(BaseModel):
+    average_debt_score: float
+    top_debt_modules: list[DebtModule]
+    recommended_refactoring_order: list[str]
+
+
+class PerformanceFinding(BaseModel):
+    file: str
+    line: int
+    kind: str
+    message: str
+    confidence: str  # "high" or "low"
+
+
+class PerformanceReport(BaseModel):
+    findings: list[PerformanceFinding]
+    bottleneck_modules: list[str]
+
+
+class ExplanationRequest(BaseModel):
+    repo_url: str = Field(max_length=300)
+    prompt_kind: str = "repository_overview"
+
+
+class MentorRequest(BaseModel):
+    repo_url: str = Field(max_length=300)
+    finding_file: str
+    finding_kind: str
+
+
+class ExplanationResponse(BaseModel):
+    text: str
+    source: str  # "deterministic" or "anthropic"
+    grounded_in: list[str]
