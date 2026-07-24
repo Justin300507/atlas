@@ -20,6 +20,17 @@ def test_parse_python_file_extracts_imports_defs_and_routes():
     assert ("GET", "/items") in symbols.routes
 
 
+def test_route_pattern_inside_a_string_literal_is_not_extracted_as_a_real_route():
+    # Regression test: a raw regex scan over the whole file text can't
+    # distinguish a real `@app.get(...)` decorator from the same text
+    # appearing inside an LLM prompt template string embedding example API
+    # code as documentation. Reported against a real repo where routes
+    # were extracted from *_prompt.py files (2026-07-24).
+    symbols = parse_file(FIXTURES / "python_symbols" / "prompt_with_embedded_route_text.py")
+    assert symbols is not None
+    assert symbols.routes == []
+
+
 def test_parse_js_file_extracts_imports_defs_and_routes():
     symbols = parse_file(FIXTURES / "js_symbols" / "sample.js")
     assert symbols is not None

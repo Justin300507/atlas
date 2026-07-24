@@ -129,6 +129,21 @@ def analyze_structure(
         if symbols is not None:
             files.append(symbols)
 
+    # detect() only recognizes a fixed set of manifest markers -- an
+    # unrecognized framework, or a backend with no manifest committed at
+    # all, still has real evidence sitting in `files` by this point: actual
+    # extracted HTTP routes. Saying "Not detected" when Atlas can see 107
+    # real routes is a worse answer than an honest "found routes, can't
+    # name the framework" -- reported against a real repo (2026-07-24).
+    if stack.backend is None:
+        route_languages = sorted({f.language for f in files if f.routes})
+        if route_languages:
+            stack = stack.model_copy(
+                update={
+                    "backend": f"Unrecognized framework ({', '.join(route_languages)} HTTP routes detected)"
+                }
+            )
+
     notify("building_graph")
     graph = build_graph(files, repo_root=repo_path)
 

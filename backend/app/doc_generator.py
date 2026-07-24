@@ -11,7 +11,9 @@ from .models import (
     FileCoverage,
     GitIntelligenceReport,
     PerformanceReport,
+    QualityIssue,
     QualityReport,
+    SecurityIssue,
     SecurityReport,
     SemanticReport,
     StackReport,
@@ -487,6 +489,27 @@ def _dependency_diagram(graph: nx.DiGraph) -> str:
     return "\n".join(lines)
 
 
+def _findings_by_kind_breakdown(ordered: list[QualityIssue] | list[SecurityIssue], limit: int) -> list[str]:
+    # A flat capped list gives no sense of shape when there are hundreds of
+    # findings -- a reader facing "...and 576 additional findings" has no
+    # way to tell whether that's 576 near-duplicates of one pattern or 576
+    # genuinely distinct problems. Only shown when the cap actually hides
+    # something. Reported against a real 440-file repo (2026-07-24).
+    if len(ordered) <= limit:
+        return []
+    kind_counts: dict[str, int] = {}
+    for issue in ordered:
+        kind_counts[issue.kind] = kind_counts.get(issue.kind, 0) + 1
+    plural = "y" if len(kind_counts) == 1 else "ies"
+    lines = [f"{len(ordered)} findings across {len(kind_counts)} categor{plural}:", ""]
+    for kind, count in sorted(kind_counts.items(), key=lambda kv: (-kv[1], kv[0])):
+        lines.append(f"- {kind}: {count}")
+    lines.append("")
+    lines.append(f"Highest-severity findings shown below (top {limit}):")
+    lines.append("")
+    return lines
+
+
 def _risk_areas(repo_root: Path, quality: QualityReport) -> str:
     lines = ["## Risk Areas", ""]
     if not quality.issues:
@@ -494,6 +517,7 @@ def _risk_areas(repo_root: Path, quality: QualityReport) -> str:
         return "\n".join(lines)
 
     ordered = sorted(quality.issues, key=lambda i: _SEVERITY_ORDER.get(i.severity, 99))
+    lines.extend(_findings_by_kind_breakdown(ordered, _RISK_AREAS_LIMIT))
     shown = ordered[:_RISK_AREAS_LIMIT]
     for issue in shown:
         rel = _relative(repo_root, issue.file)
@@ -513,6 +537,7 @@ def _security_findings(repo_root: Path, security: SecurityReport) -> str:
         return "\n".join(lines)
 
     ordered = sorted(security.issues, key=lambda i: _SEVERITY_ORDER.get(i.severity, 99))
+    lines.extend(_findings_by_kind_breakdown(ordered, _SECURITY_FINDINGS_LIMIT))
     shown = ordered[:_SECURITY_FINDINGS_LIMIT]
     for issue in shown:
         rel = _relative(repo_root, issue.file)

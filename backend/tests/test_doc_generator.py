@@ -233,6 +233,41 @@ def test_risk_areas_caps_at_20_with_overflow_note():
     assert "and 5 additional findings" in section
 
 
+def test_risk_areas_shows_by_kind_breakdown_when_overflowing():
+    # Regression test: a real 440-file repo's report said "...and 576
+    # additional findings" with no further structure -- a reader has no
+    # way to tell whether that's 576 near-duplicates or 576 distinct
+    # problems. Reported (2026-07-24).
+    issues = [
+        QualityIssue(file=f"app/mod_{i}.py", line=1, kind="long_function", message="x", severity="minor")
+        for i in range(15)
+    ] + [
+        QualityIssue(file=f"app/mod_{i}.py", line=1, kind="high_complexity", message="x", severity="important")
+        for i in range(10)
+    ]
+    quality = QualityReport(overall_score=0, maintainability_score=0, architecture_score=100, issues=issues)
+
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], nx.DiGraph(), quality, _empty_security(), _empty_git())
+
+    section = doc.split("## Risk Areas")[1].split("## ")[0]
+    assert "25 findings across 2 categories" in section
+    assert "long_function: 15" in section
+    assert "high_complexity: 10" in section
+
+
+def test_risk_areas_omits_breakdown_when_under_the_cap():
+    issues = [
+        QualityIssue(file="app/a.py", line=1, kind="long_function", message="x", severity="minor")
+        for _ in range(3)
+    ]
+    quality = QualityReport(overall_score=90, maintainability_score=90, architecture_score=100, issues=issues)
+
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], nx.DiGraph(), quality, _empty_security(), _empty_git())
+
+    section = doc.split("## Risk Areas")[1].split("## ")[0]
+    assert "findings across" not in section
+
+
 def test_security_findings_lists_issues_with_relative_paths():
     security = SecurityReport(
         issues=[

@@ -34,23 +34,48 @@ _AUTH_MARKERS = {
 }
 
 
+# Manifest files are checked at the repo root AND one level into each
+# top-level directory -- covers the common backend/ + frontend/ monorepo
+# split (this is literally Atlas's own layout: backend/requirements.txt,
+# frontend/package.json) without an unbounded recursive walk. Reported
+# against a real repo whose manifest lived at backend/requirements.txt and
+# was invisible to a root-only check, so a FastAPI backend with 107 real
+# routes reported "Backend: Not detected" (2026-07-24).
+_MANIFEST_EXCLUDED_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__", "dist", "build"}
+
+
+def _manifest_locations(repo_path: Path, name: str) -> list[Path]:
+    locations = [repo_path / name]
+    if repo_path.is_dir():
+        for child in sorted(repo_path.iterdir()):
+            if child.is_dir() and child.name not in _MANIFEST_EXCLUDED_DIRS:
+                locations.append(child / name)
+    return locations
+
+
 def _read_text_files(repo_path: Path, names: list[str]) -> str:
     combined = ""
     for name in names:
-        f = repo_path / name
-        if f.exists():
-            combined += f.read_text(errors="ignore").lower() + "\n"
+        for f in _manifest_locations(repo_path, name):
+            if f.exists():
+                combined += f.read_text(errors="ignore").lower() + "\n"
     return combined
 
 
 def _package_json(repo_path: Path) -> dict:
-    f = repo_path / "package.json"
-    if not f.exists():
-        return {}
-    try:
-        return json.loads(f.read_text(errors="ignore"))
-    except json.JSONDecodeError:
-        return {}
+    merged = {"dependencies": {}, "devDependencies": {}}
+    found_any = False
+    for f in _manifest_locations(repo_path, "package.json"):
+        if not f.exists():
+            continue
+        try:
+            data = json.loads(f.read_text(errors="ignore"))
+        except json.JSONDecodeError:
+            continue
+        found_any = True
+        merged["dependencies"].update(data.get("dependencies", {}))
+        merged["devDependencies"].update(data.get("devDependencies", {}))
+    return merged if found_any else {}
 
 
 def detect(repo_path: Path) -> StackReport:

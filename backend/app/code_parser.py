@@ -15,7 +15,7 @@ _LANGUAGE_BY_EXT = {
 }
 
 _ROUTE_PATTERN = re.compile(
-    r"""(?:@app|@router|app|router)\s*\.\s*(get|post|put|delete|patch)\s*\(\s*["']([^"']+)["']""",
+    rb"""(?:@app|@router|app|router)\s*\.\s*(get|post|put|delete|patch)\s*\(\s*["']([^"']+)["']""",
     re.IGNORECASE,
 )
 
@@ -133,6 +133,39 @@ def _extract_defined(root, source: bytes, lang: str) -> list[str]:
     return defined
 
 
+def _string_node_byte_ranges(root) -> list[tuple[int, int]]:
+    ranges: list[tuple[int, int]] = []
+
+    def walk(node):
+        if node.type == "string":
+            ranges.append((node.start_byte, node.end_byte))
+            return  # nothing inside a string literal needs separate matching
+        for child in node.children:
+            walk(child)
+
+    walk(root)
+    return ranges
+
+
+def _extract_routes(root, source: bytes) -> list[tuple[str, str]]:
+    # A raw regex scan over the whole file can't distinguish a real
+    # `@app.get("/x")` decorator from the same text appearing inside a
+    # string literal -- e.g. an LLM prompt template embedding example API
+    # code as documentation. A real decorator's own path argument is a
+    # *separate*, later string node than the "@app.get(" text itself, so
+    # excluding matches whose start falls inside *any* string node's byte
+    # range filters out the embedded-in-a-string case without touching
+    # real decorators. Reported against a real repo where routes were
+    # extracted from *_prompt.py files (2026-07-24).
+    string_ranges = _string_node_byte_ranges(root)
+    routes: list[tuple[str, str]] = []
+    for m in _ROUTE_PATTERN.finditer(source):
+        if any(start <= m.start() < end for start, end in string_ranges):
+            continue
+        routes.append((m.group(1).decode("ascii").upper(), m.group(2).decode("utf-8", errors="ignore")))
+    return routes
+
+
 def _count_branches(node, lang: str) -> int:
     branch_types = _BRANCH_NODE_TYPES.get(lang, set())
     count = 0
@@ -201,8 +234,7 @@ def parse_file(path: Path) -> FileSymbols | None:
     tree = parser.parse(source)
     imports = _extract_imports(tree.root_node, source, lang)
     defined = _extract_defined(tree.root_node, source, lang)
-    raw_routes = _ROUTE_PATTERN.findall(source.decode("utf-8", errors="ignore"))
-    routes = [(method.upper(), route_path) for method, route_path in raw_routes]
+    routes = _extract_routes(tree.root_node, source)
     functions = _extract_functions(tree.root_node, source, lang)
     class_names = _extract_class_names(tree.root_node, source, lang)
     return FileSymbols(

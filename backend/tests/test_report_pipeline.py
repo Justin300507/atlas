@@ -24,6 +24,20 @@ def test_analyze_structure_returns_stack_files_graph_and_quality():
     assert coverage.files_parse_failed == 0
 
 
+def test_analyze_structure_reports_unrecognized_framework_when_routes_are_found(tmp_path):
+    # Regression test: a backend with real extracted routes but no
+    # recognized manifest marker (unusual framework, or the manifest lives
+    # somewhere stack_detector doesn't look) reported "Backend: Not
+    # detected" despite Atlas having direct evidence of an HTTP backend.
+    # Reported against a real repo (2026-07-24).
+    (tmp_path / "app.py").write_text('@router.get("/items")\ndef items():\n    return []\n')
+
+    stack, files, _graph, _quality, _security, _coverage = analyze_structure(tmp_path)
+
+    assert files[0].routes == [("GET", "/items")]
+    assert stack.backend == "Unrecognized framework (python HTTP routes detected)"
+
+
 def test_analyze_structure_reports_file_cap_hit(monkeypatch, tmp_path):
     # Regression test for the silent-truncation gap found during real-world
     # validation (2026-07-24): the file-count cap has existed since Phase 2
