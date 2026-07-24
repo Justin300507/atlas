@@ -62,6 +62,28 @@ def _read_text_files(repo_path: Path, names: list[str]) -> str:
     return combined
 
 
+def _known_dir_names(repo_path: Path) -> set[str]:
+    """Directory names at the repo root AND one level into each top-level
+    directory -- same rationale as _manifest_locations: a backend/ +
+    frontend/ split (or similar) puts routers/services/models one level
+    deeper than a flat layout, so a root-only check misses it. Reported
+    against a real repo with backend/services and backend/routes
+    (2026-07-24)."""
+    names: set[str] = set()
+    if not repo_path.is_dir():
+        return names
+    for child in repo_path.iterdir():
+        if not child.is_dir():
+            continue
+        names.add(child.name)
+        if child.name in _MANIFEST_EXCLUDED_DIRS:
+            continue
+        for grandchild in child.iterdir():
+            if grandchild.is_dir():
+                names.add(grandchild.name)
+    return names
+
+
 def _package_json(repo_path: Path) -> dict:
     merged = {"dependencies": {}, "devDependencies": {}}
     found_any = False
@@ -110,10 +132,19 @@ def detect(repo_path: Path) -> StackReport:
     if (repo_path / "docker-compose.yml").exists() or (repo_path / "docker-compose.yaml").exists():
         deployment = "Docker Compose"
 
+    # "routes" added alongside the existing "routers" -- both are common
+    # naming conventions for the same thing (a real repo used "routes").
     architecture = None
-    known_dirs = {p.name for p in repo_path.iterdir() if p.is_dir()}
-    if {"routers", "services", "models"} & known_dirs:
-        architecture = "Layered MVC"
+    known_dirs = _known_dir_names(repo_path)
+    if {"routers", "routes", "services", "models"} & known_dirs:
+        architecture = "Layered / Service-Oriented"
+    elif backend and frontend:
+        # Weaker evidence than a recognized directory layout, but a repo
+        # with both a detected backend and a detected frontend is still a
+        # client-server split, not "Not detected" -- a real repo had
+        # FastAPI + React + PostgreSQL + JWT + Docker all detected
+        # individually, yet architecture stayed blank (2026-07-24).
+        architecture = "Client-Server"
 
     return StackReport(
         backend=backend,

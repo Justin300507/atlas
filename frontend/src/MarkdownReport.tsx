@@ -89,13 +89,70 @@ function TableBlock({ children }: { children?: React.ReactNode }) {
   );
 }
 
+// How long the "Copied!" confirmation stays up before reverting to the
+// button's normal label.
+const COPY_CONFIRMATION_MS = 2000;
+
+function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  // Fallback for contexts without the async Clipboard API (an insecure
+  // origin, or an older browser) -- a hidden, off-screen textarea plus the
+  // legacy execCommand path still works broadly.
+  return new Promise((resolve, reject) => {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try {
+      if (document.execCommand("copy")) {
+        resolve();
+      } else {
+        reject(new Error("execCommand('copy') returned false"));
+      }
+    } catch (err) {
+      reject(err);
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  });
+}
+
+function CopyReportButton({ markdown }: { markdown: string }) {
+  // "idle" | "copied" | "failed" -- "failed" is rare (needs an insecure
+  // origin AND a browser old enough to lack execCommand) but worth telling
+  // the user about rather than silently doing nothing.
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+
+  function handleCopy() {
+    copyText(markdown)
+      .then(() => setStatus("copied"))
+      .catch(() => setStatus("failed"));
+    setTimeout(() => setStatus("idle"), COPY_CONFIRMATION_MS);
+  }
+
+  const label = status === "copied" ? "Copied!" : status === "failed" ? "Copy failed" : "Copy Report";
+  return (
+    <button type="button" onClick={handleCopy} className="copy-report-button">
+      {label}
+    </button>
+  );
+}
+
 export function MarkdownReport({ markdown }: { markdown: string }) {
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{ code: CodeBlock, table: TableBlock }}
-    >
-      {markdown}
-    </ReactMarkdown>
+    <div>
+      <CopyReportButton markdown={markdown} />
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{ code: CodeBlock, table: TableBlock }}
+      >
+        {markdown}
+      </ReactMarkdown>
+    </div>
   );
 }

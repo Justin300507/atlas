@@ -8,8 +8,10 @@ from .code_parser import FileSymbols
 from .models import (
     ComparisonFinding,
     ComparisonReport,
+    DebtModule,
     FileCoverage,
     GitIntelligenceReport,
+    PerformanceFinding,
     PerformanceReport,
     QualityIssue,
     QualityReport,
@@ -24,6 +26,8 @@ from .semantic_analysis import _LAYER_ORDER
 _DIAGRAM_NODE_CAP = 40
 _HIGH_CHURN_LIMIT = 10
 _RISK_AREAS_LIMIT = 20
+_PERFORMANCE_FINDINGS_LIMIT = 20
+_DEBT_CONCENTRATION_TOP_N = 3
 _COMPARISON_DIAGRAM_CAP = 15
 _SECURITY_FINDINGS_LIMIT = 20
 _SEVERITY_ORDER = {"critical": 0, "important": 1, "minor": 2}
@@ -371,7 +375,32 @@ def _technical_debt(debt: TechnicalDebtReport) -> str:
             f"| {m.file} | {m.debt_score:.2f} | {m.category} | {m.confidence} | "
             f"{'; '.join(m.evidence)} |"
         )
+
+    concentration = _debt_concentration_note(debt.top_debt_modules)
+    if concentration:
+        lines.append("")
+        lines.append(concentration)
     return "\n".join(lines)
+
+
+def _debt_concentration_note(modules: list[DebtModule]) -> str | None:
+    # A reader shouldn't have to eyeball a 15-row table to tell whether
+    # debt is spread evenly or concentrated in a handful of modules --
+    # state the measured concentration among the modules actually shown.
+    # Deliberately doesn't name *why* those modules are central (Atlas
+    # doesn't know their purpose, e.g. "orchestration") -- only the
+    # measured score concentration, which it does know.
+    if len(modules) <= _DEBT_CONCENTRATION_TOP_N:
+        return None
+    total = sum(m.debt_score for m in modules)
+    if total <= 0:
+        return None
+    top_total = sum(m.debt_score for m in modules[:_DEBT_CONCENTRATION_TOP_N])
+    ratio = top_total / total
+    return (
+        f"The top {_DEBT_CONCENTRATION_TOP_N} of the {len(modules)} modules shown account for "
+        f"{ratio:.0%} of their combined debt score."
+    )
 
 
 def _performance_analysis(performance: PerformanceReport) -> str:
@@ -390,9 +419,16 @@ def _performance_analysis(performance: PerformanceReport) -> str:
 
     lines.append("")
     ordered = sorted(performance.findings, key=lambda f: (f.confidence != "high", f.file, f.line))
-    for f in ordered:
+    lines.extend(_findings_by_kind_breakdown(ordered, _PERFORMANCE_FINDINGS_LIMIT))
+    shown = ordered[:_PERFORMANCE_FINDINGS_LIMIT]
+    for f in shown:
         location = f"{f.file}:{f.line}" if f.line else f.file
         lines.append(f"- **{f.confidence} confidence** `{location}` {f.kind}: {f.message}")
+
+    remainder = len(ordered) - len(shown)
+    if remainder > 0:
+        lines.append("")
+        lines.append(f"_...and {remainder} additional findings._")
 
     if performance.bottleneck_modules:
         lines.append("")
@@ -489,7 +525,9 @@ def _dependency_diagram(graph: nx.DiGraph) -> str:
     return "\n".join(lines)
 
 
-def _findings_by_kind_breakdown(ordered: list[QualityIssue] | list[SecurityIssue], limit: int) -> list[str]:
+def _findings_by_kind_breakdown(
+    ordered: list[QualityIssue] | list[SecurityIssue] | list[PerformanceFinding], limit: int
+) -> list[str]:
     # A flat capped list gives no sense of shape when there are hundreds of
     # findings -- a reader facing "...and 576 additional findings" has no
     # way to tell whether that's 576 near-duplicates of one pattern or 576

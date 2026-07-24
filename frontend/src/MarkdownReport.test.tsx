@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
-import { describe, expect, it, vi } from "vitest";
-import { render, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, waitFor } from "@testing-library/react";
 
 // Regression test for the concurrency bug found via real-browser validation:
 // mermaid.render() isn't safe to call concurrently, and React StrictMode
@@ -44,6 +44,36 @@ describe("MarkdownReport mermaid concurrency", () => {
     });
 
     expect(maxConcurrentCalls).toBe(1);
+  });
+});
+
+describe("MarkdownReport copy button", () => {
+  const originalClipboard = navigator.clipboard;
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "clipboard", { value: originalClipboard, configurable: true });
+  });
+
+  it("copies the raw markdown source (not rendered HTML) and confirms it", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const markdown = "## Executive Summary\n\n- Backend: FastAPI\n";
+
+    const { getByRole, findByRole } = render(<MarkdownReport markdown={markdown} />);
+    fireEvent.click(getByRole("button", { name: "Copy Report" }));
+
+    expect(writeText).toHaveBeenCalledWith(markdown);
+    await findByRole("button", { name: "Copied!" });
+  });
+
+  it("falls back to the confirmation-less state when copying fails", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+
+    const { getByRole, findByRole } = render(<MarkdownReport markdown="hello" />);
+    fireEvent.click(getByRole("button", { name: "Copy Report" }));
+
+    await findByRole("button", { name: "Copy failed" });
   });
 });
 

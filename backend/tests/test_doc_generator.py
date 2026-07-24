@@ -453,6 +453,61 @@ def test_performance_analysis_section_only_appears_when_performance_provided():
     assert "Dependency bottlenecks" in with_perf
 
 
+def test_performance_analysis_caps_findings_with_by_kind_breakdown_when_overflowing():
+    # Regression test: a real 440-file repo's Performance Analysis section
+    # spanned dozens of entries with no cap and no shape -- unlike Risk
+    # Areas and Security Findings, which already capped. Reported (2026-07-24).
+    findings = [
+        PerformanceFinding(file=f"mod_{i}.py", line=1, kind="very_large_function", message="x", confidence="high")
+        for i in range(15)
+    ] + [
+        PerformanceFinding(file=f"mod_{i}.py", line=1, kind="high_branch_count", message="x", confidence="low")
+        for i in range(10)
+    ]
+    performance = PerformanceReport(findings=findings, bottleneck_modules=[])
+
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git(),
+        performance=performance,
+    )
+
+    section = doc.split("## Performance Analysis")[1].split("## ")[0]
+    assert "25 findings across 2 categories" in section
+    assert "very_large_function: 15" in section
+    assert section.count("mod_") == 20  # 20 shown bullets; breakdown lines name kinds, not files
+    assert "and 5 additional findings" in section
+
+
+def test_technical_debt_shows_concentration_note_when_more_than_three_modules():
+    # Regression test: a 15-row debt table gave no sense of whether debt was
+    # spread evenly or concentrated in a few modules. Reported against a
+    # real 440-file repo (2026-07-24).
+    modules = [
+        DebtModule(file=f"m{i}.py", debt_score=score, category="coupling_smell", confidence="high", evidence=["x"])
+        for i, score in enumerate([50.0, 30.0, 20.0, 5.0, 5.0])
+    ]
+    debt = TechnicalDebtReport(average_debt_score=22.0, top_debt_modules=modules, recommended_refactoring_order=[])
+
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git(), debt=debt,
+    )
+
+    assert "The top 3 of the 5 modules shown account for 91% of their combined debt score." in doc
+
+
+def test_technical_debt_omits_concentration_note_for_three_or_fewer_modules():
+    modules = [
+        DebtModule(file="a.py", debt_score=10.0, category="coupling_smell", confidence="high", evidence=["x"]),
+    ]
+    debt = TechnicalDebtReport(average_debt_score=10.0, top_debt_modules=modules, recommended_refactoring_order=[])
+
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git(), debt=debt,
+    )
+
+    assert "account for" not in doc
+
+
 def test_analysis_coverage_footer_discloses_support_and_limitations():
     doc = generate_documentation(
         REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git()
