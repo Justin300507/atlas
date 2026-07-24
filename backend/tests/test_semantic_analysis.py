@@ -147,7 +147,7 @@ def test_layering_violation_reported_only_when_layer_detection_is_confident():
     paths = [
         "presentation/view.py",
         "api/routes.py",
-        "service/logic.py",
+        "services/logic.py",
         "domain/model.py",
         "infrastructure/adapter.py",
         "persistence/repo.py",
@@ -324,6 +324,22 @@ def test_circular_cluster_count_reused_from_quality_report_not_recomputed():
     report = analyze_semantics(files, graph, quality, [])
 
     assert report.architecture_health.circular_cluster_count == 1
+
+
+def test_layer_edges_aggregate_import_counts_between_layers():
+    graph = nx.DiGraph()
+    paths = ["api/routes.py", "api/other.py", "services/logic.py", "domain/model.py"]
+    for p in paths:
+        graph.add_node(p, type="module")
+    graph.add_edge("api/routes.py", "services/logic.py", type="import")
+    graph.add_edge("api/other.py", "services/logic.py", type="import")
+    graph.add_edge("services/logic.py", "domain/model.py", type="import")
+
+    files = [_file(p) for p in paths]
+    report = analyze_semantics(files, graph, _empty_quality(), [])
+
+    edges = {(e.from_layer, e.to_layer): e.edge_count for e in report.subsystem_overview.layer_edges}
+    assert edges == {("api", "service"): 2, ("service", "domain"): 1}
 
 
 def test_empty_repo_produces_an_empty_report_not_a_crash():

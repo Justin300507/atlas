@@ -120,10 +120,17 @@ class CriticalModule(BaseModel):
     criticality_score: float
 
 
+class LayerEdge(BaseModel):
+    from_layer: str
+    to_layer: str
+    edge_count: int
+
+
 class SubsystemOverview(BaseModel):
     confident: bool
     coverage_ratio: float
     layer_counts: dict[str, int]
+    layer_edges: list[LayerEdge]
 
 
 class EngineeringHotspot(BaseModel):

@@ -13,6 +13,7 @@ from .models import (
     CouplingIssue,
     CriticalModule,
     EngineeringHotspot,
+    LayerEdge,
     QualityReport,
     SemanticReport,
     SubsystemOverview,
@@ -160,16 +161,36 @@ def _detect_layers(
     return assignments, coverage
 
 
+def _layer_edges(module_graph: nx.DiGraph, layer_assignments: dict[str, str]) -> list[LayerEdge]:
+    counts: dict[tuple[str, str], int] = {}
+    for u, v in module_graph.edges():
+        layer_u = layer_assignments.get(u)
+        layer_v = layer_assignments.get(v)
+        if layer_u is None or layer_v is None:
+            continue
+        key = (layer_u, layer_v)
+        counts[key] = counts.get(key, 0) + 1
+    return [
+        LayerEdge(from_layer=a, to_layer=b, edge_count=count)
+        for (a, b), count in sorted(counts.items(), key=lambda kv: -kv[1])
+    ]
+
+
 def _subsystem_overview(
-    layer_assignments: dict[str, str], coverage: float
+    module_graph: nx.DiGraph, layer_assignments: dict[str, str], coverage: float
 ) -> SubsystemOverview:
     confident = coverage >= _LAYER_CONFIDENCE_THRESHOLD
     layer_counts: dict[str, int] = {}
+    layer_edges: list[LayerEdge] = []
     if confident:
         for layer in layer_assignments.values():
             layer_counts[layer] = layer_counts.get(layer, 0) + 1
+        layer_edges = _layer_edges(module_graph, layer_assignments)
     return SubsystemOverview(
-        confident=confident, coverage_ratio=round(coverage, 4), layer_counts=layer_counts
+        confident=confident,
+        coverage_ratio=round(coverage, 4),
+        layer_counts=layer_counts,
+        layer_edges=layer_edges,
     )
 
 
@@ -375,7 +396,7 @@ def analyze_semantics(
     circular_cluster_count = sum(1 for i in quality.issues if i.kind == "circular_import")
 
     layer_assignments, coverage = _detect_layers(repo_root, module_nodes)
-    subsystem = _subsystem_overview(layer_assignments, coverage)
+    subsystem = _subsystem_overview(module_graph, layer_assignments, coverage)
 
     coupling_issues, smells = _analyze_coupling_and_smells(files, metrics, repo_root)
     if subsystem.confident:

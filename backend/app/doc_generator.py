@@ -10,14 +10,17 @@ from .models import (
     GitIntelligenceReport,
     QualityReport,
     SecurityReport,
+    SemanticReport,
     StackReport,
 )
+from .semantic_analysis import _LAYER_ORDER
 
 _DIAGRAM_NODE_CAP = 40
 _HIGH_CHURN_LIMIT = 10
 _RISK_AREAS_LIMIT = 20
 _SECURITY_FINDINGS_LIMIT = 20
 _SEVERITY_ORDER = {"critical": 0, "important": 1, "minor": 2}
+_CRITICAL_MODULE_DIAGRAM_CAP = 15
 
 
 def generate_documentation(
@@ -29,18 +32,34 @@ def generate_documentation(
     security: SecurityReport,
     git_report: GitIntelligenceReport,
     coverage: FileCoverage | None = None,
+    semantic: SemanticReport | None = None,
 ) -> str:
     sections = [
         _executive_summary(stack, files, quality, git_report, coverage),
         _architecture_overview(graph),
-        _directory_guide(repo_root, files),
-        _api_reference(repo_root, files),
-        _dependency_diagram(graph),
-        _risk_areas(repo_root, quality),
-        _security_findings(repo_root, security),
-        _high_churn_components(git_report),
-        _analysis_coverage(),
     ]
+    if semantic is not None:
+        sections.append(_architecture_health(semantic))
+        sections.append(_dependency_criticality(repo_root, semantic, graph))
+        sections.append(_subsystem_overview(repo_root, semantic))
+    sections.extend(
+        [
+            _directory_guide(repo_root, files),
+            _api_reference(repo_root, files),
+            _dependency_diagram(graph),
+            _risk_areas(repo_root, quality),
+        ]
+    )
+    if semantic is not None:
+        sections.append(_engineering_hotspots(semantic))
+        sections.append(_coupling_and_smells(semantic))
+    sections.extend(
+        [
+            _security_findings(repo_root, security),
+            _high_churn_components(git_report),
+            _analysis_coverage(),
+        ]
+    )
     return "\n\n".join(sections) + "\n"
 
 
@@ -113,6 +132,154 @@ def _architecture_overview(graph: nx.DiGraph) -> str:
             for path, count in top:
                 lines.append(f"- {PurePath(path).name} ({count} importers)")
 
+    return "\n".join(lines)
+
+
+def _architecture_health(semantic: SemanticReport) -> str:
+    h = semantic.architecture_health
+    lines = [
+        "## Architecture Health",
+        "",
+        f"- Strongly connected (circular-dependency) clusters: {h.circular_cluster_count}",
+        "- Articulation points (single modules whose removal disconnects the "
+        f"import graph): {h.articulation_point_count}",
+        "- Bridge edges (single import edges whose removal disconnects the "
+        f"import graph): {h.bridge_count}",
+        "- Dependency concentration: the top 5 most-depended-upon modules "
+        f"receive {h.dependency_concentration_top5_ratio:.0%} of all import edges",
+    ]
+    if not h.betweenness_computed:
+        lines.append("")
+        lines.append(
+            f"_Betweenness/closeness centrality skipped — {h.module_count} modules "
+            "exceeds this analysis' computation ceiling. Dependency Criticality below "
+            "is ranked by fan-in only for this repository, not the fan-in-weighted "
+            "betweenness used on smaller repos._"
+        )
+    return "\n".join(lines)
+
+
+def _dependency_criticality(repo_root: Path, semantic: SemanticReport, graph: nx.DiGraph) -> str:
+    lines = [
+        "## Dependency Criticality",
+        "",
+        "Modules ranked by how much of the codebase would likely be affected if "
+        "they changed — fan-in weighted by betweenness centrality (how often a "
+        "module sits on the only path between two others), not fan-in alone. A "
+        "heuristic ranking, not a proof of impact.",
+    ]
+    if not semantic.critical_modules:
+        lines.append("")
+        lines.append("No modules with incoming dependencies detected.")
+        return "\n".join(lines)
+
+    lines.append("")
+    lines.append("| Module | Fan-in | Fan-out | Betweenness |")
+    lines.append("|---|---:|---:|---:|")
+    for m in semantic.critical_modules:
+        lines.append(f"| {m.file} | {m.fan_in} | {m.fan_out} | {m.betweenness:.3f} |")
+
+    diagram = _critical_module_diagram(repo_root, semantic, graph)
+    if diagram:
+        lines.append("")
+        lines.append(diagram)
+    return "\n".join(lines)
+
+
+def _critical_module_diagram(repo_root: Path, semantic: SemanticReport, graph: nx.DiGraph) -> str:
+    selected = {m.file for m in semantic.critical_modules[:_CRITICAL_MODULE_DIAGRAM_CAP]}
+    if not selected:
+        return ""
+
+    node_ids: dict[str, str] = {}
+    diagram_lines = ["```mermaid", "graph TD"]
+    drawn = False
+    for u, v, d in graph.edges(data=True):
+        if d.get("type") != "import":
+            continue
+        ru, rv = _relative(repo_root, u), _relative(repo_root, v)
+        if ru not in selected or rv not in selected:
+            continue
+        for rel in (ru, rv):
+            if rel not in node_ids:
+                node_ids[rel] = f"n{len(node_ids)}"
+        diagram_lines.append(
+            f'    {node_ids[ru]}["{PurePath(ru).name}"] --> {node_ids[rv]}["{PurePath(rv).name}"]'
+        )
+        drawn = True
+    diagram_lines.append("```")
+    return "\n".join(diagram_lines) if drawn else ""
+
+
+def _subsystem_overview(repo_root: Path, semantic: SemanticReport) -> str:
+    s = semantic.subsystem_overview
+    lines = ["## Subsystem Overview", ""]
+    if not s.confident:
+        lines.append(
+            f"Insufficient evidence for layer detection — only {s.coverage_ratio:.0%} of "
+            "modules matched a recognized layer-naming convention (presentation / api / "
+            "service / domain / infrastructure / persistence). Not guessing at this "
+            "repository's architecture rather than forcing a low-confidence answer."
+        )
+        return "\n".join(lines)
+
+    lines.append(
+        f"Layer detection matched {s.coverage_ratio:.0%} of modules against a fixed "
+        "directory-naming vocabulary:"
+    )
+    lines.append("")
+    lines.append("| Layer | Modules |")
+    lines.append("|---|---:|")
+    for layer in _LAYER_ORDER:
+        if layer in s.layer_counts:
+            lines.append(f"| {layer} | {s.layer_counts[layer]} |")
+
+    if s.layer_edges:
+        lines.append("")
+        lines.append("```mermaid")
+        lines.append("graph TD")
+        for e in s.layer_edges:
+            lines.append(f'    {e.from_layer}["{e.from_layer}"] -->|"{e.edge_count}"| {e.to_layer}["{e.to_layer}"]')
+        lines.append("```")
+    return "\n".join(lines)
+
+
+def _engineering_hotspots(semantic: SemanticReport) -> str:
+    lines = [
+        "## Engineering Hotspots",
+        "",
+        "Modules ranked by git churn × dependency centrality × complexity issues, "
+        "each factor normalized against this repository before multiplying. A module "
+        "with zero recent churn never appears here regardless of how central or "
+        "complex it is — this section is about active maintenance risk, not general "
+        "importance.",
+    ]
+    if not semantic.hotspots:
+        lines.append("")
+        lines.append("No modules had all three risk factors (churn, centrality, complexity) present.")
+        return "\n".join(lines)
+
+    lines.append("")
+    lines.append("| Module | Churn (commits) | Centrality | Complexity issues | Hotspot score |")
+    lines.append("|---|---:|---:|---:|---:|")
+    for h in semantic.hotspots:
+        lines.append(
+            f"| {h.file} | {h.churn} | {h.centrality:.3f} | {h.complexity_issues} | {h.hotspot_score:.3f} |"
+        )
+    return "\n".join(lines)
+
+
+def _coupling_and_smells(semantic: SemanticReport) -> str:
+    lines = ["## Coupling & Architectural Smells", ""]
+    findings = [(i.severity, i.kind, i.file, i.message) for i in semantic.coupling_issues]
+    findings += [(s.severity, s.kind, s.file, s.message) for s in semantic.architectural_smells]
+    if not findings:
+        lines.append("No coupling issues or architectural smells detected.")
+        return "\n".join(lines)
+
+    findings.sort(key=lambda f: _SEVERITY_ORDER.get(f[0], 99))
+    for severity, kind, file, message in findings:
+        lines.append(f"- **{severity}** `{file}` {kind}: {message}")
     return "\n".join(lines)
 
 
