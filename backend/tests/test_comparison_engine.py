@@ -1,7 +1,9 @@
 from app.comparison_engine import compare_snapshots
 from app.models import (
     AnalysisSnapshot,
+    SnapshotDebtSummary,
     SnapshotGitSummary,
+    SnapshotPerformanceSummary,
     SnapshotSecuritySummary,
     SnapshotSemanticSummary,
 )
@@ -164,3 +166,46 @@ def test_identical_snapshots_produce_no_findings():
     assert report.regressions == []
     assert report.improvements == []
     assert all(not m.significant for m in report.metric_changes)
+
+
+def test_debt_and_performance_metrics_omitted_when_either_snapshot_lacks_them():
+    a = _snapshot()  # debt/performance default to None (pre-v1.3 snapshot)
+    b = _snapshot(
+        debt=SnapshotDebtSummary(average_debt_score=10.0, top_debt_modules=["hub.py"]),
+        performance=SnapshotPerformanceSummary(finding_count=2, bottleneck_modules=["hub.py"]),
+    )
+
+    report = compare_snapshots(a, b)
+
+    labels = {m.label for m in report.metric_changes}
+    assert "Average technical debt score" not in labels
+    assert "Performance finding count" not in labels
+
+
+def test_debt_and_performance_metrics_present_when_both_snapshots_have_them():
+    a = _snapshot(
+        debt=SnapshotDebtSummary(average_debt_score=8.0, top_debt_modules=["a.py"]),
+        performance=SnapshotPerformanceSummary(finding_count=1, bottleneck_modules=["a.py"]),
+    )
+    b = _snapshot(
+        debt=SnapshotDebtSummary(average_debt_score=12.0, top_debt_modules=["b.py"]),
+        performance=SnapshotPerformanceSummary(finding_count=3, bottleneck_modules=["b.py"]),
+    )
+
+    report = compare_snapshots(a, b)
+
+    debt_metric = next(m for m in report.metric_changes if m.label == "Average technical debt score")
+    assert debt_metric.before == 8.0
+    assert debt_metric.after == 12.0
+
+    perf_metric = next(m for m in report.metric_changes if m.label == "Performance finding count")
+    assert perf_metric.before == 1
+    assert perf_metric.after == 3
+
+    debt_set = next(s for s in report.set_changes if s.label == "Top debt modules")
+    assert debt_set.added == ["b.py"]
+    assert debt_set.removed == ["a.py"]
+
+    perf_set = next(s for s in report.set_changes if s.label == "Performance bottleneck modules")
+    assert perf_set.added == ["b.py"]
+    assert perf_set.removed == ["a.py"]

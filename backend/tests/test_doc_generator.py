@@ -5,14 +5,18 @@ import networkx as nx
 from app.code_parser import FileSymbols
 from app.doc_generator import generate_documentation
 from app.models import (
+    DebtModule,
     FileChurn,
     FileCoverage,
     GitIntelligenceReport,
+    PerformanceFinding,
+    PerformanceReport,
     QualityIssue,
     QualityReport,
     SecurityIssue,
     SecurityReport,
     StackReport,
+    TechnicalDebtReport,
 )
 
 REPO_ROOT = Path("/repo")
@@ -271,6 +275,57 @@ def test_empty_repo_renders_without_crashing():
         "## Analysis Coverage",
     ):
         assert header in doc
+
+
+def test_technical_debt_section_only_appears_when_debt_provided():
+    without_debt = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git()
+    )
+    assert "## Technical Debt" not in without_debt
+
+    debt = TechnicalDebtReport(
+        average_debt_score=8.5,
+        top_debt_modules=[
+            DebtModule(
+                file="hub.py", debt_score=8.5, category="coupling_smell",
+                confidence="high", evidence=["flagged as a coupling issue"],
+            )
+        ],
+        recommended_refactoring_order=["hub.py"],
+    )
+    with_debt = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git(),
+        debt=debt,
+    )
+    assert "## Technical Debt" in with_debt
+    assert "hub.py" in with_debt
+    assert "8.50" in with_debt
+    assert "flagged as a coupling issue" in with_debt
+
+
+def test_performance_analysis_section_only_appears_when_performance_provided():
+    without_perf = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git()
+    )
+    assert "## Performance Analysis" not in without_perf
+
+    performance = PerformanceReport(
+        findings=[
+            PerformanceFinding(
+                file="hub.py", line=10, kind="very_large_function",
+                message="too big", confidence="high",
+            )
+        ],
+        bottleneck_modules=["hub.py"],
+    )
+    with_perf = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git(),
+        performance=performance,
+    )
+    assert "## Performance Analysis" in with_perf
+    assert "hub.py:10" in with_perf
+    assert "too big" in with_perf
+    assert "Dependency bottlenecks" in with_perf
 
 
 def test_analysis_coverage_footer_discloses_support_and_limitations():

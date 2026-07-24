@@ -78,6 +78,28 @@ def compare_snapshots(a: AnalysisSnapshot, b: AnalysisSnapshot) -> ComparisonRep
         _set_change("Git churn top 15", a.git.top_churn_files, b.git.top_churn_files),
     ]
 
+    # debt/performance are optional (schema_version 2, v1.3) -- a snapshot
+    # from before this feature has them as None, so only compare when both
+    # sides actually have the data rather than treating a missing field as
+    # a metric change from/to zero.
+    if a.debt is not None and b.debt is not None:
+        metric_changes.append(
+            _metric_change("Average technical debt score", a.debt.average_debt_score, b.debt.average_debt_score)
+        )
+        set_changes.append(_set_change("Top debt modules", a.debt.top_debt_modules, b.debt.top_debt_modules))
+
+    if a.performance is not None and b.performance is not None:
+        metric_changes.append(
+            _metric_change("Performance finding count", a.performance.finding_count, b.performance.finding_count)
+        )
+        set_changes.append(
+            _set_change(
+                "Performance bottleneck modules",
+                a.performance.bottleneck_modules,
+                b.performance.bottleneck_modules,
+            )
+        )
+
     regressions: list[ComparisonFinding] = []
     improvements: list[ComparisonFinding] = []
 

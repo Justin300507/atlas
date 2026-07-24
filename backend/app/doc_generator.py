@@ -10,10 +10,12 @@ from .models import (
     ComparisonReport,
     FileCoverage,
     GitIntelligenceReport,
+    PerformanceReport,
     QualityReport,
     SecurityReport,
     SemanticReport,
     StackReport,
+    TechnicalDebtReport,
 )
 from .semantic_analysis import _LAYER_ORDER
 
@@ -36,6 +38,8 @@ def generate_documentation(
     git_report: GitIntelligenceReport,
     coverage: FileCoverage | None = None,
     semantic: SemanticReport | None = None,
+    debt: TechnicalDebtReport | None = None,
+    performance: PerformanceReport | None = None,
 ) -> str:
     sections = [
         _executive_summary(stack, files, quality, git_report, coverage),
@@ -56,6 +60,10 @@ def generate_documentation(
     if semantic is not None:
         sections.append(_engineering_hotspots(semantic))
         sections.append(_coupling_and_smells(semantic))
+    if debt is not None:
+        sections.append(_technical_debt(debt))
+    if performance is not None:
+        sections.append(_performance_analysis(performance))
     sections.extend(
         [
             _security_findings(repo_root, security),
@@ -283,6 +291,62 @@ def _coupling_and_smells(semantic: SemanticReport) -> str:
     findings.sort(key=lambda f: _SEVERITY_ORDER.get(f[0], 99))
     for severity, kind, file, message in findings:
         lines.append(f"- **{severity}** `{file}` {kind}: {message}")
+    return "\n".join(lines)
+
+
+def _technical_debt(debt: TechnicalDebtReport) -> str:
+    lines = [
+        "## Technical Debt",
+        "",
+        "Modules ranked by a weighted combination of complexity-under-churn, "
+        "dependency-criticality-under-size, coupling/architectural smells, and "
+        "circular-dependency membership. Confidence is `low` where git history "
+        "or betweenness centrality was unavailable for this repository — the "
+        "score itself is still shown, but treat it as a rougher estimate.",
+    ]
+    if not debt.top_debt_modules:
+        lines.append("")
+        lines.append("No modules had any of the four debt signals present.")
+        return "\n".join(lines)
+
+    lines.append("")
+    lines.append(f"Average debt score across flagged modules: {debt.average_debt_score:.2f}")
+    lines.append("")
+    lines.append("| Module | Debt score | Primary driver | Confidence | Evidence |")
+    lines.append("|---|---:|---|:-:|---|")
+    for m in debt.top_debt_modules:
+        lines.append(
+            f"| {m.file} | {m.debt_score:.2f} | {m.category} | {m.confidence} | "
+            f"{'; '.join(m.evidence)} |"
+        )
+    return "\n".join(lines)
+
+
+def _performance_analysis(performance: PerformanceReport) -> str:
+    lines = [
+        "## Performance Analysis",
+        "",
+        "Static, deterministic signals only — Atlas doesn't execute code or "
+        "profile runtime behavior, so nothing here is a measured performance "
+        "cost. Findings marked `low` confidence are proxy signals, not direct "
+        "measurements.",
+    ]
+    if not performance.findings:
+        lines.append("")
+        lines.append("No performance findings detected.")
+        return "\n".join(lines)
+
+    lines.append("")
+    ordered = sorted(performance.findings, key=lambda f: (f.confidence != "high", f.file, f.line))
+    for f in ordered:
+        location = f"{f.file}:{f.line}" if f.line else f.file
+        lines.append(f"- **{f.confidence} confidence** `{location}` {f.kind}: {f.message}")
+
+    if performance.bottleneck_modules:
+        lines.append("")
+        lines.append("Dependency bottlenecks (critical-path modules also flagged for coupling):")
+        for module in performance.bottleneck_modules:
+            lines.append(f"- {module}")
     return "\n".join(lines)
 
 

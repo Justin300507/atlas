@@ -5,12 +5,16 @@ from datetime import datetime, timezone
 from .models import (
     AnalysisSnapshot,
     GitIntelligenceReport,
+    PerformanceReport,
     QualityReport,
     SecurityReport,
     SemanticReport,
+    SnapshotDebtSummary,
     SnapshotGitSummary,
+    SnapshotPerformanceSummary,
     SnapshotSecuritySummary,
     SnapshotSemanticSummary,
+    TechnicalDebtReport,
 )
 
 # See docs/superpowers/specs/2026-07-24-repository-comparison-design.md.
@@ -27,6 +31,8 @@ def build_snapshot(
     security: SecurityReport,
     git_report: GitIntelligenceReport,
     semantic: SemanticReport,
+    debt: TechnicalDebtReport | None = None,
+    performance: PerformanceReport | None = None,
 ) -> AnalysisSnapshot:
     security_counts = {"critical": 0, "important": 0, "minor": 0}
     for issue in security.issues:
@@ -59,4 +65,16 @@ def build_snapshot(
             coupling_issue_count=len(semantic.coupling_issues),
             smell_count=len(semantic.architectural_smells),
         ),
+        debt=SnapshotDebtSummary(
+            average_debt_score=debt.average_debt_score,
+            top_debt_modules=[m.file for m in debt.top_debt_modules[:_TOP_N_MODULES]],
+        )
+        if debt is not None
+        else None,
+        performance=SnapshotPerformanceSummary(
+            finding_count=len(performance.findings),
+            bottleneck_modules=performance.bottleneck_modules[:_TOP_N_MODULES],
+        )
+        if performance is not None
+        else None,
     )

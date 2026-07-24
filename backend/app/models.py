@@ -304,6 +304,7 @@ class PerformanceReport(BaseModel):
 class ExplanationRequest(BaseModel):
     repo_url: str = Field(max_length=300)
     prompt_kind: str = "repository_overview"
+    file: str | None = None  # required by prompt_kinds scoped to one module
 
 
 class MentorRequest(BaseModel):

@@ -19,11 +19,13 @@ from .models import (
     SecurityReport,
     StackReport,
 )
+from .performance_analyzer import analyze_performance
 from .quality_engine import analyze_quality
 from .security_scanner import scan_files
 from .semantic_analysis import analyze_semantics
 from .snapshot import build_snapshot
 from .stack_detector import detect
+from .technical_debt import analyze_technical_debt
 
 # Bounds on parsing arbitrary cloned repos: this pipeline clones and parses
 # arbitrary public repo URLs with no auth, so a pathological repo (one huge
@@ -171,9 +173,18 @@ def run_full_analysis(
         notify("analyzing_semantics")
         semantic = analyze_semantics(files, graph, quality, commits, repo_root=repo_path)
 
+        # Both reuse already-computed files/graph/quality/semantic/commits --
+        # no new parsing or cloning, see the v1.3 design doc's "reuse, don't
+        # recollect" principle.
+        notify("analyzing_technical_debt")
+        debt = analyze_technical_debt(files, graph, quality, semantic, commits, repo_root=repo_path)
+
+        notify("analyzing_performance")
+        performance = analyze_performance(files, semantic, repo_root=repo_path)
+
     notify("generating_documentation")
     markdown = generate_documentation(
-        repo_root, stack, files, graph, quality, security, git_report, coverage, semantic
+        repo_root, stack, files, graph, quality, security, git_report, coverage, semantic, debt, performance
     )
-    snapshot = build_snapshot(repo_url, quality, security, git_report, semantic)
+    snapshot = build_snapshot(repo_url, quality, security, git_report, semantic, debt, performance)
     return DocumentationResponse(markdown=markdown, snapshot=snapshot)
