@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { motion, useReducedMotion, type Variants } from "motion/react";
 import "./App.css";
 import { compareJobs, createJob, getJob, JobNotFoundError, type JobRecord } from "./api";
+import { GraphBackground } from "./GraphBackground";
 import { MarkdownReport } from "./MarkdownReport";
 
 // The backend clones the repo once (deep enough to cover both structure and
@@ -27,6 +29,30 @@ const STAGE_LABELS: Record<string, string> = {
   analyzing_semantics: "Analyzing architecture",
   generating_documentation: "Generating documentation",
 };
+
+// Hero entrance: the eyebrow/headline/subhead/command-bar stagger in as one
+// composed moment on first paint. Collapses to an instant, non-moving state
+// under prefers-reduced-motion rather than just a shorter version of the
+// same animation.
+function heroContainerVariants(reducedMotion: boolean): Variants {
+  return {
+    hidden: {},
+    show: {
+      transition: reducedMotion ? { duration: 0 } : { staggerChildren: 0.09, delayChildren: 0.1 },
+    },
+  };
+}
+
+function heroItemVariants(reducedMotion: boolean): Variants {
+  return {
+    hidden: reducedMotion ? {} : { opacity: 0, y: 16 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: reducedMotion ? { duration: 0 } : { duration: 0.55, ease: [0.16, 1, 0.3, 1] },
+    },
+  };
+}
 
 type ViewState = "idle" | "running" | "done" | "error";
 
@@ -130,6 +156,7 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
   const pollRef = useRef<number | null>(null);
   const timerRef = useRef<number | null>(null);
   const hasCheckedRecovery = useRef(false);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     return () => {
@@ -259,40 +286,67 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
 
   return (
     <div className="app">
-      <h1>Atlas</h1>
+      <header className="topbar">
+        <button
+          type="button"
+          className="brand-mark"
+          onClick={reset}
+          aria-label="Atlas — start a new analysis"
+        >
+          Atlas
+        </button>
+      </header>
 
       {view === "idle" && (
-        <>
-          <p className="tagline">
-            Paste a public GitHub repo and get a full engineering review — stack, architecture,
-            code quality, security, and git history — in one report.
-          </p>
-          <form onSubmit={handleSubmit}>
-            <label htmlFor="repo-url" className="sr-only">
-              GitHub repository URL
-            </label>
-            <input
-              id="repo-url"
-              type="text"
-              placeholder="https://github.com/owner/repo"
-              value={repoUrl}
-              onChange={(e) => setRepoUrl(e.target.value)}
-              required
-            />
-            <button type="submit" disabled={submitting}>
-              {submitting ? "Starting…" : "Analyze"}
-            </button>
+        <section className="hero">
+          <GraphBackground />
+          <motion.div
+            className="hero-content"
+            initial="hidden"
+            animate="show"
+            variants={heroContainerVariants(!!reducedMotion)}
+          >
+            <motion.p className="eyebrow" variants={heroItemVariants(!!reducedMotion)}>
+              Deterministic static analysis
+            </motion.p>
+            <motion.h1 variants={heroItemVariants(!!reducedMotion)}>
+              Every codebase has a shape you can't see.
+            </motion.h1>
+            <motion.p className="subhead" variants={heroItemVariants(!!reducedMotion)}>
+              Paste a public GitHub repo and get a full engineering review — stack, architecture,
+              code quality, security, and git history — in one report.
+            </motion.p>
+            <motion.form
+              className="command-bar"
+              variants={heroItemVariants(!!reducedMotion)}
+              onSubmit={handleSubmit}
+            >
+              <label htmlFor="repo-url" className="sr-only">
+                GitHub repository URL
+              </label>
+              <input
+                id="repo-url"
+                type="text"
+                placeholder="https://github.com/owner/repo"
+                value={repoUrl}
+                onChange={(e) => setRepoUrl(e.target.value)}
+                required
+              />
+              <button type="submit" disabled={submitting}>
+                {submitting ? "Starting…" : "Analyze"}
+              </button>
+            </motion.form>
             {submitError && (
-              <p className="error" role="alert">
+              <motion.p className="error" role="alert" variants={heroItemVariants(!!reducedMotion)}>
                 {submitError}
-              </p>
+              </motion.p>
             )}
-          </form>
-        </>
+          </motion.div>
+        </section>
       )}
 
       {view === "running" && (
-        <div className="progress" aria-busy="true">
+        <div className="panel progress" aria-busy="true">
           <p>{elapsedSeconds}s elapsed</p>
           {/* Visually hidden but real text content, so a stage change is an
               actual DOM mutation an aria-live region will announce -- toggling
@@ -316,7 +370,7 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
       )}
 
       {view === "done" && job?.markdown && (
-        <div className="report">
+        <div className="panel report">
           <button onClick={reset}>New Analysis</button>
           {previousJob && (
             <button
@@ -346,7 +400,7 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
       )}
 
       {view === "error" && (
-        <div className="report">
+        <div className="panel report">
           <p className="error" role="alert">
             {job?.error ?? "Analysis failed"}
           </p>
