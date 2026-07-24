@@ -1,3 +1,3 @@
 # Benchmark-only tooling. Not installed in the Docker image / production
 # deployment -- see backend/scripts/benchmark.py.
-psutil>=6.0,<8.0
+psutil>=7.2.2,<8.0
