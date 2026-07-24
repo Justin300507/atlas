@@ -54,10 +54,16 @@ get back the rendered report. It survives a page refresh mid-analysis.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — module responsibilities, request-flow diagram.
 - [`DEPLOYMENT.md`](DEPLOYMENT.md) — environment variables, Docker, production checklist.
 - [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) — common setup/runtime issues.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — local setup, test/lint commands, PR conventions.
+- [`FAQ.md`](FAQ.md) — what Atlas is/isn't, how it was validated, and a full
+  known-limitations list (security scanner blind spots, scoring caveats,
+  size caps, the rate limiter's known reverse-proxy gap).
+- [`ROADMAP.md`](ROADMAP.md) — what's shipped and validated vs. planned.
 - [`docs/examples/`](docs/examples/) — real generated reports.
-- [`docs/benchmarks/`](docs/benchmarks/) — measured performance across repo sizes.
+- [`docs/benchmarks/`](docs/benchmarks/) — measured performance and
+  real-repository validation results.
 - `docs/superpowers/specs/` — a design doc per feature, including explicitly
-  documented known limitations for each.
+  documented known limitations for each (source material for `FAQ.md`).
 
 ## Project layout
 
@@ -71,6 +77,8 @@ get back the rendered report. It survives a page refresh mid-analysis.
 
 AI Architect (natural-language Q&A grounded in the dependency graph),
 Technical Debt Analyzer, Performance Analyzer, AI Mentor. See
-`docs/superpowers/specs/` for the design docs behind everything that *is*
-built, including known limitations (e.g. the CORS/rate-limiting posture
-documented in the production-security-hardening and CORS-hardening specs).
+[`ROADMAP.md`](ROADMAP.md) for what each would involve and why the
+backend is frozen on these for now, and [`FAQ.md`](FAQ.md) for known
+limitations in what *is* built (e.g. the CORS/rate-limiting posture
+documented in the production-security-hardening and CORS-hardening
+specs).
