@@ -134,6 +134,27 @@ described a limitation that a later fix removed, it's omitted here.
 - Scoring weights and smoothing constants are hand-picked heuristics,
   not calibrated against a labeled dataset.
 
+### Semantic repository intelligence
+
+- Layer detection matches directory names against a fixed vocabulary
+  (presentation/api/service/domain/infrastructure/persistence). A repo
+  organized by feature instead of by layer correctly gets "insufficient
+  evidence" — verified on Atlas's own repo, which reports 0% coverage
+  since it's organized by technical role (`app/`, `tests/`), not layer.
+- Betweenness/closeness centrality are skipped above 5,500 modules (a
+  defensive ceiling — measured cost was 4.28s on Django's 3038 modules,
+  trivial next to that repo's 40-80s clone+parse time, and the existing
+  5,000-file analysis cap means module count can't actually reach the
+  ceiling in practice).
+- Coupling/smell thresholds are percentile-based within the analyzed
+  repo, not fixed magic numbers — a repo where the large majority of
+  modules share the same fan-in/fan-out value will correctly report
+  nothing (no real variance to rank against) rather than a false
+  positive, which means very sparse or undifferentiated repos get less
+  coupling analysis, not wrong analysis.
+- Facade/utility-dumping detection is a pattern match (filename +
+  fan-in/fan-out shape), not a claim about the author's intent.
+
 ### Git intelligence
 
 - Bug-fix commit detection is one regex against the commit subject line

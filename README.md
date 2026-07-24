@@ -21,8 +21,13 @@ Given a public GitHub URL, Atlas clones it and produces:
   execution, and unsafe deserialization.
 - **Git Intelligence** — file churn, bug-fix hotspots, ownership, and
   co-change patterns from commit history.
+- **Semantic Repository Intelligence** — graph-theoretic architecture metrics
+  (centrality, articulation points, bridges), dependency criticality ranking,
+  deterministic layer detection (says so honestly when a repo doesn't match a
+  recognized convention, rather than guessing), engineering hotspots (churn ×
+  centrality × complexity), and coupling/architectural-smell detection.
 - **Documentation Generator** — a single Markdown report combining all of the
-  above, with a Mermaid dependency diagram.
+  above, with Mermaid dependency, critical-module, and subsystem diagrams.
 
 All deterministic, static analysis — no LLM calls in the pipeline itself.
 See two real generated reports in [`docs/examples/`](docs/examples/) (a

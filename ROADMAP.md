@@ -20,6 +20,7 @@ tests) and checked for believable output — see
 | Security Scanner | `security_scanner.py` | Regex-based secrets/exec/deserialization detection — see [`FAQ.md`](FAQ.md#security-scanner) for what it doesn't catch |
 | Git Intelligence | `git_intelligence.py`, `git_log_parser.py` | Churn, ownership, co-change, bounded to last 500 commits |
 | Documentation Generator | `doc_generator.py` | Assembles the final Markdown report, no LLM involved |
+| Semantic Repository Intelligence | `semantic_analysis.py` | Architecture metrics, dependency criticality, layer detection, engineering hotspots, coupling/smell detection — validated on Django, Flask, and requests |
 
 ## Not yet built
 

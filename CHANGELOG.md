@@ -7,6 +7,25 @@ Beta launch and groups by capability milestone, not by commit; see
 
 ## [Unreleased]
 
+### Added
+
+- **Semantic Repository Intelligence Engine** — architecture metrics
+  (fan-in/out, betweenness/closeness centrality, articulation points,
+  bridges), dependency criticality ranking, deterministic layer
+  detection (reports "insufficient evidence" rather than guessing),
+  engineering hotspots (churn × centrality × complexity), and
+  coupling/architectural-smell detection (god modules, facades,
+  utility dumping, isolated components, layering violations). New
+  report sections: Architecture Health, Dependency Criticality,
+  Subsystem Overview, Engineering Hotspots, Coupling & Architectural
+  Smells, plus two new Mermaid diagrams. See
+  `docs/superpowers/specs/2026-07-24-semantic-repository-intelligence-design.md`
+  for every algorithm/threshold decision. Validated against Django,
+  Flask, and requests; findings cross-checked against real domain
+  knowledge (e.g. `django/utils/functional.py` correctly flagged as
+  Django's most-imported utility module).
+
+
 Post-launch operations pass, same day as the Public Beta release —
 found by dogfooding and live walkthroughs, not by user reports (the
 repo had zero issues/PRs/discussions at the time this section was
@@ -38,6 +57,13 @@ on what "evidence-driven" could actually mean yet).
   explicitly rather than assumed present) plus a bounded retry on the
   workflow's own check as defense-in-depth. Verified fixed via a live
   CI run, not just static review.
+- SQLite "database is locked" under concurrent job writes — the
+  semantic-analysis engine's extra per-job write tipped already-tight
+  write contention over the default busy-timeout on a loaded CI
+  runner. Fixed with WAL mode + a longer timeout; that fix then hit
+  its own real issue (40 threads racing to switch a brand-new file to
+  WAL mode can collide on Windows), fixed with a bounded retry around
+  just that first-time switch.
 
 ### Dependencies
 
