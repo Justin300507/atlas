@@ -81,6 +81,17 @@ Bug fixes and doc-only changes don't need one.
   mirroring the module name (`test_<module>.py`).
 - Prefer a failing test that reproduces the bug before fixing it.
 
+## Issues vs. Discussions
+
+Use an [issue](https://github.com/Justin300507/atlas/issues/new/choose)
+for a specific bug, false positive/negative, or feature request —
+anything actionable. Use
+[Discussions](https://github.com/Justin300507/atlas/discussions) for
+"how do I..." questions, ideas that aren't fully formed yet, or sharing
+a report Atlas generated on your own repo. If you're not sure which,
+Discussions is the lower-friction choice — it can always turn into an
+issue once it's concrete.
+
 ## Reporting bugs / false positives
 
 Atlas's credibility depends on findings being real. If you find a false

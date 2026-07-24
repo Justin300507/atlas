@@ -1,0 +1,49 @@
+name: False positive / false negative in a report
+description: A security finding, quality score, or graph edge Atlas produced doesn't hold up against the real repo — this is the most valuable kind of report Atlas can get.
+labels: ["bug", "false-positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Atlas's credibility depends on findings being real (see
+        [`FAQ.md`](../../FAQ.md)). A false positive is not a minor
+        annoyance to this project — it's the core failure mode. Please be
+        as specific as possible.
+  - type: input
+    id: repo-url
+    attributes:
+      label: Repo URL analyzed
+    validations:
+      required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Which engine produced the wrong result?
+      options:
+        - Security Scanner
+        - Code Quality Engine (scores)
+        - Architecture Graph (import/route edges)
+        - Git Intelligence
+        - Repository Intelligence (stack detection)
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: File and line the finding pointed to
+      placeholder: e.g. src/auth/utils.py:42
+    validations:
+      required: true
+  - type: textarea
+    id: expected-vs-actual
+    attributes:
+      label: What Atlas said vs. what's actually true
+      description: Quote the exact finding text, then explain why it's wrong (or what real issue was missed).
+    validations:
+      required: true
+  - type: textarea
+    id: code-snippet
+    attributes:
+      label: The relevant code (if you can share it)
+      render: text

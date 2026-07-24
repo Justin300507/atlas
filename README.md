@@ -59,6 +59,8 @@ get back the rendered report. It survives a page refresh mid-analysis.
   known-limitations list (security scanner blind spots, scoring caveats,
   size caps, the rate limiter's known reverse-proxy gap).
 - [`ROADMAP.md`](ROADMAP.md) — what's shipped and validated vs. planned.
+- [`CHANGELOG.md`](CHANGELOG.md) — what's shipped, grouped by milestone.
+- [`SECURITY.md`](SECURITY.md) — how to report a vulnerability.
 - [`docs/examples/`](docs/examples/) — real generated reports.
 - [`docs/benchmarks/`](docs/benchmarks/) — measured performance and
   real-repository validation results.

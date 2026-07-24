@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest something new for Atlas.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check [`ROADMAP.md`](../../ROADMAP.md) first — your idea
+        may already be a planned-but-not-built subsystem (AI Architect,
+        Technical Debt Analyzer, Performance Analyzer, AI Mentor), in
+        which case this issue helps prioritize it rather than duplicate
+        it. Also note: **Atlas won't add LLM calls to the deterministic
+        analysis pipeline** — that's a deliberate positioning choice, not
+        an oversight (see [`ARCHITECTURE.md`](../../ARCHITECTURE.md)).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What are you trying to do with Atlas that you currently can't?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd want it to do
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered

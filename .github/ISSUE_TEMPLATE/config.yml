@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or general discussion
+    url: https://github.com/Justin300507/atlas/discussions
+    about: For "how do I..." questions or open-ended discussion, not a specific bug/feature.
+  - name: Security vulnerability
+    url: https://github.com/Justin300507/atlas/security/advisories/new
+    about: Report privately — see SECURITY.md. Do not open a public issue for this.
