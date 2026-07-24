@@ -37,7 +37,22 @@ jobs:
           test "$status" = "ok"
 
       - name: Frontend serves the app shell
-        run: curl -sf http://localhost:5173/ | grep -qi "<div id=\"root\"" || (echo "frontend did not return the expected app shell" && exit 1)
+        # Retries because `--wait` above only guarantees the containers
+        # that HAVE a healthcheck are ready -- frontend didn't have one
+        # (fixed in docker-compose.yml), so this is belt-and-suspenders
+        # against the same class of startup race, not a substitute for
+        # that fix.
+        run: |
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:5173/ | grep -qi '<div id="root"'; then
+              echo "frontend app shell OK"
+              exit 0
+            fi
+            echo "attempt $i: frontend not ready yet, retrying..."
+            sleep 2
+          done
+          echo "frontend did not return the expected app shell after retries"
+          exit 1
 
       - name: Dump logs on failure
         if: failure()
