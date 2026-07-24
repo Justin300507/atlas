@@ -138,9 +138,15 @@ def analyze_structure(
     if stack.backend is None:
         route_languages = sorted({f.language for f in files if f.routes})
         if route_languages:
+            # Explicitly labeled lower confidence -- requested: extend the
+            # high/low-confidence pattern already used for debt/performance
+            # findings to inferred stack info too (2026-07-24).
             stack = stack.model_copy(
                 update={
-                    "backend": f"Unrecognized framework ({', '.join(route_languages)} HTTP routes detected)"
+                    "backend": (
+                        f"Unrecognized framework ({', '.join(route_languages)} HTTP routes "
+                        "detected, lower confidence -- no manifest match)"
+                    )
                 }
             )
 

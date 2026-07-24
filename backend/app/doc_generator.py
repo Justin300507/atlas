@@ -49,7 +49,7 @@ def generate_documentation(
     performance: PerformanceReport | None = None,
 ) -> str:
     sections = [
-        _executive_summary(stack, files, quality, security, git_report, coverage, debt),
+        _executive_summary(stack, files, quality, security, git_report, coverage, semantic, debt),
         _architecture_overview(graph),
     ]
     if semantic is not None:
@@ -109,6 +109,29 @@ def _health_label(score: int) -> str:
 _DEBT_CONCENTRATION_NARRATIVE_THRESHOLD = 0.5
 
 
+def _health_qualifiers(
+    semantic: SemanticReport | None, debt: TechnicalDebtReport | None
+) -> list[str]:
+    # A numeric-score bucket alone can read as more reassuring than the
+    # underlying evidence supports -- e.g. "Good overall quality" next to
+    # 3 circular-dependency clusters and several god modules read as
+    # contradictory. Each qualifier here is a plain presence check against
+    # a finding already computed and shown elsewhere in the report -- not
+    # a new judgment call, just surfacing what's already there next to the
+    # headline label. Reported (2026-07-24).
+    qualifiers: list[str] = []
+    if semantic is not None:
+        if semantic.architecture_health.circular_cluster_count > 0:
+            qualifiers.append("circular-dependency clusters")
+        if any(c.kind == "god_module" for c in semantic.coupling_issues):
+            qualifiers.append("god-module coupling")
+    if debt is not None and debt.top_debt_modules:
+        ratio = _debt_concentration_ratio(debt.top_debt_modules)
+        if ratio is not None and ratio >= _DEBT_CONCENTRATION_NARRATIVE_THRESHOLD:
+            qualifiers.append("concentrated technical debt")
+    return qualifiers
+
+
 def _executive_summary(
     stack: StackReport,
     files: list[FileSymbols],
@@ -116,6 +139,7 @@ def _executive_summary(
     security: SecurityReport,
     git_report: GitIntelligenceReport,
     coverage: FileCoverage | None = None,
+    semantic: SemanticReport | None = None,
     debt: TechnicalDebtReport | None = None,
 ) -> str:
     lines = ["## Executive Summary", ""]
@@ -139,23 +163,26 @@ def _executive_summary(
     # concentration, coupling, modularity) would be wrong: architecture
     # score is purely circular-dependency-cluster-based, maintainability is
     # purely function-length/complexity/naming-based. Neither factors in
-    # coupling or dependency concentration -- those live in Dependency
-    # Criticality and Coupling & Smells instead (2026-07-24).
+    # coupling, dependency concentration, bridges, or articulation points
+    # -- those are computed and reported (Architecture Health, Dependency
+    # Criticality, Coupling & Smells) but deliberately don't feed into this
+    # score. Widening the formula to include them would change what every
+    # existing comparison/snapshot means, so that's a real design decision
+    # for its own pass, not a wording fix (2026-07-24).
+    qualifiers = _health_qualifiers(semantic, debt)
+    qualifier_clause = f", with {', '.join(qualifiers)}" if qualifiers else ""
     lines.append(
-        f"- Repository health: {_health_label(quality.overall_score)} overall quality."
+        f"- Repository health: {_health_label(quality.overall_score)} overall quality"
+        f"{qualifier_clause}."
     )
-    if debt is not None and debt.top_debt_modules:
-        ratio = _debt_concentration_ratio(debt.top_debt_modules)
-        if ratio is not None and ratio >= _DEBT_CONCENTRATION_NARRATIVE_THRESHOLD:
-            lines.append(
-                "  Technical debt is concentrated in a small number of modules "
-                "(see Technical Debt below), not spread evenly."
-            )
     lines.append(
         "  _Maintainability reflects how often functions exceed length/complexity/"
-        "naming thresholds, as a proportion rather than a raw count; architecture "
-        "reflects circular-dependency clusters (how many, how large, and how many "
-        "modules participate). Overall is their average._"
+        "naming thresholds, as a proportion rather than a raw count. Architecture "
+        "score reflects circular-dependency clusters only (how many, how large, and "
+        "how many modules participate) -- bridges, articulation points, dependency "
+        "concentration, coupling, and dependency criticality are analyzed and shown "
+        "separately below but don't feed into this score. Overall is the average of "
+        "the two._"
     )
     # A reader who sees "100/100" and only later scrolls to a critical
     # security finding reasonably reads that as contradictory -- the score

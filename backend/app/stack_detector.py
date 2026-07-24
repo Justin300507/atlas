@@ -144,7 +144,11 @@ def detect(repo_path: Path) -> StackReport:
         # client-server split, not "Not detected" -- a real repo had
         # FastAPI + React + PostgreSQL + JWT + Docker all detected
         # individually, yet architecture stayed blank (2026-07-24).
-        architecture = "Client-Server"
+        # Labeled explicitly as inferred (lower confidence than the
+        # directory-layout match above) -- requested: extend the
+        # high/low-confidence pattern already used for debt/performance
+        # findings to inferred stack/architecture info too (2026-07-24).
+        architecture = "Client-Server (inferred from detected backend + frontend, lower confidence)"
 
     return StackReport(
         backend=backend,

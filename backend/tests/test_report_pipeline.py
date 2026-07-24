@@ -35,7 +35,7 @@ def test_analyze_structure_reports_unrecognized_framework_when_routes_are_found(
     stack, files, _graph, _quality, _security, _coverage = analyze_structure(tmp_path)
 
     assert files[0].routes == [("GET", "/items")]
-    assert stack.backend == "Unrecognized framework (python HTTP routes detected)"
+    assert stack.backend == "Unrecognized framework (python HTTP routes detected, lower confidence -- no manifest match)"
 
 
 def test_analyze_structure_reports_file_cap_hit(monkeypatch, tmp_path):

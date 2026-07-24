@@ -87,6 +87,68 @@ def test_executive_summary_reports_no_security_findings_when_clean():
     assert "Security findings: none detected -- not reflected in the score above" in doc
 
 
+def test_executive_summary_health_line_has_no_qualifiers_when_clean():
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [_file("app/main.py")], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git(),
+        semantic=_single_module_semantic(),
+    )
+
+    assert "Repository health: Strong overall quality." in doc
+
+
+def test_executive_summary_health_line_qualifies_good_score_with_real_risks():
+    # Regression test: "Good overall quality" next to 3 circular-dependency
+    # clusters and a god module read as contradictory -- the numeric-score
+    # bucket alone doesn't reflect evidence shown elsewhere in the same
+    # report. Reported (2026-07-24).
+    quality = QualityReport(overall_score=72, maintainability_score=80, architecture_score=64, issues=[])
+    semantic = SemanticReport(
+        architecture_health=ArchitectureHealth(
+            module_count=5, import_edge_count=8, circular_cluster_count=3,
+            articulation_point_count=0, bridge_count=0, betweenness_computed=True,
+            dependency_concentration_top5_ratio=0.5,
+        ),
+        critical_modules=[],
+        subsystem_overview=SubsystemOverview(confident=False, coverage_ratio=0.0, layer_counts={}, layer_edges=[]),
+        hotspots=[],
+        coupling_issues=[
+            CouplingIssue(file="main.py", kind="god_module", message="fan-out 39", severity="important"),
+        ],
+        architectural_smells=[],
+    )
+    debt = TechnicalDebtReport(
+        average_debt_score=20.0,
+        top_debt_modules=[
+            DebtModule(file=f"m{i}.py", debt_score=score, category="coupling_smell", confidence="high", evidence=["x"])
+            for i, score in enumerate([50.0, 30.0, 20.0, 5.0, 5.0])
+        ],
+        recommended_refactoring_order=[],
+    )
+
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), quality, _empty_security(), _empty_git(),
+        semantic=semantic, debt=debt,
+    )
+
+    assert (
+        "Repository health: Good overall quality, with circular-dependency clusters, "
+        "god-module coupling, concentrated technical debt." in doc
+    )
+
+
+def test_executive_summary_explains_architecture_score_scope_precisely():
+    # Regression test: asked whether bridges/articulation points/coupling/
+    # concentration/criticality feed into architecture_score -- verified
+    # against quality_engine.py rather than guessed, and made explicit that
+    # they don't (2026-07-24).
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git()
+    )
+
+    assert "circular-dependency clusters only" in doc
+    assert "don't feed into this score" in doc
+
+
 def test_executive_summary_omits_coverage_note_when_not_capped():
     files = [_file("app/main.py")]
     graph = nx.DiGraph()

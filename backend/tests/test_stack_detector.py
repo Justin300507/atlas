@@ -67,7 +67,7 @@ def test_architecture_inferred_as_client_server_when_backend_and_frontend_both_d
 
     assert report.backend == "FastAPI"
     assert report.frontend == "React"
-    assert report.architecture == "Client-Server"
+    assert report.architecture == "Client-Server (inferred from detected backend + frontend, lower confidence)"
 
 
 def test_architecture_not_detected_without_backend_or_recognized_directory(tmp_path):
