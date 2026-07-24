@@ -19,6 +19,15 @@ and the [methodology doc](../benchmarks/2026-07-24-real-world-validation.md).
   a CommonJS-heavy Node.js repo. Overall score 98/100 (maintainability
   95, architecture 100) — 84 routes detected via `require()`-based
   imports, no circular-dependency clusters.
+- [`atlas-self-report.md`](atlas-self-report.md) — Atlas analyzing its
+  own repository. Overall 98/100 (architecture 100 — no circular
+  imports in its own codebase). Included because running Atlas on
+  itself is how a real bug got found and fixed: the security scanner
+  was flagging its own source comments that *describe* what
+  `eval()`/`exec()`/`pickle.load()` detection does as if they were live
+  dangerous code. See the `fix: security scanner no longer flags
+  comments describing dangerous patterns` commit — dogfooding, not a
+  synthetic test case, caught it.
 
 **Not hiding the imperfect ones:** typer's architecture score (39/100)
 is low because of that 22-module cycle, and it's shown here rather than
