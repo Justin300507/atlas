@@ -248,3 +248,17 @@ here in advance.
   across all modules may report smells that a human wouldn't consider
   meaningfully "high", since even the 95th percentile of a flat
   distribution is still just "the top values that happen to exist."
+- **Found while writing tests, not by inspection**: percentile
+  thresholds degenerate to the floor value (usually 0) when the large
+  majority of modules share that value — a repo where e.g. 90%+ of
+  modules have zero fan-out will compute p95_fan_out = 0, which the
+  `p95 > 0` guard correctly turns into "report nothing" rather than
+  "flag everything with fan_out >= 0." This is the right behavior (no
+  real variance to rank against), not a bug, but it does mean coupling/
+  smell detection under-reports on repos with very sparse, undifferentiated
+  connectivity — validated as working correctly on real repos (59-module
+  Atlas itself, plus the real-repo validation batch) where fan-in/fan-out
+  distributions have enough natural spread for the percentiles to be
+  meaningful. Documented and regression-tested
+  (`test_sparse_repo_with_no_variance_reports_no_coupling_findings`), not
+  silently discovered later.

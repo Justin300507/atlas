@@ -102,5 +102,60 @@ class GitIntelligenceReport(BaseModel):
     co_changes: list[CoChangePair]
 
 
+class ArchitectureHealth(BaseModel):
+    module_count: int
+    import_edge_count: int
+    circular_cluster_count: int
+    articulation_point_count: int
+    bridge_count: int
+    betweenness_computed: bool
+    dependency_concentration_top5_ratio: float
+
+
+class CriticalModule(BaseModel):
+    file: str
+    fan_in: int
+    fan_out: int
+    betweenness: float
+    criticality_score: float
+
+
+class SubsystemOverview(BaseModel):
+    confident: bool
+    coverage_ratio: float
+    layer_counts: dict[str, int]
+
+
+class EngineeringHotspot(BaseModel):
+    file: str
+    churn: int
+    centrality: float
+    complexity_issues: int
+    hotspot_score: float
+
+
+class CouplingIssue(BaseModel):
+    file: str
+    kind: str
+    message: str
+    severity: str
+
+
+class ArchitecturalSmell(BaseModel):
+    file: str
+    kind: str
+    message: str
+    severity: str
+
+
+class SemanticReport(BaseModel):
+    architecture_health: ArchitectureHealth
+    critical_modules: list[CriticalModule]
+    subsystem_overview: SubsystemOverview
+    hotspots: list[EngineeringHotspot]
+    coupling_issues: list[CouplingIssue]
+    architectural_smells: list[ArchitecturalSmell]
+
+
 class DocumentationResponse(BaseModel):
     markdown: str
