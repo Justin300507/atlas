@@ -14,6 +14,11 @@
   --blueprint: #2b6cb0;
   --blueprint-dim: #7fa8d4;
   --signal: #e85d2c;
+  /* --signal is 3.33:1 on --paper -- fine for borders/large accents (WCAG
+     1.4.11 needs 3:1 for UI components) but fails 1.4.3's 4.5:1 for small
+     text. Use this darker shade (4.71:1) anywhere --signal colors actual
+     readable text below 18px. */
+  --signal-text: #c74416;
   --slate: #5b6472;
   --line: #d8dee4;
 
@@ -80,7 +85,7 @@ a {
 }
 
 .eyebrow strong {
-  color: var(--signal);
+  color: var(--signal-text);
   font-weight: 600;
 }
 
@@ -422,7 +427,7 @@ button:focus-visible {
   display: inline-block;
   font-family: var(--font-mono);
   font-size: 11.5px;
-  color: var(--signal);
+  color: var(--signal-text);
   margin-bottom: 8px;
 }
 
@@ -613,7 +618,7 @@ button:focus-visible {
 .proof-card .file {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--signal);
+  color: var(--signal-text);
   margin-bottom: 10px;
 }
 
