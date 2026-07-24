@@ -38,14 +38,14 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      # nginx:alpine ships wget via busybox, no extra package needed.
       # Without this, `docker compose up --wait` only confirms the
       # container reached "running" state, not that nginx has finished
       # its docker-entrypoint.d setup scripts and is actually serving --
       # a real race that hit docker-validate.yml's CI check once (the
       # curl ran while nginx was still mid-startup, confirmed via
-      # `docker compose logs` on the failed run).
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+      # `docker compose logs` on the failed run). curl is installed
+      # explicitly in the Dockerfile rather than assumed present.
+      test: ["CMD", "curl", "-sf", "http://localhost:80/"]
       interval: 10s
       timeout: 5s
       retries: 3

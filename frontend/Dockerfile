@@ -18,6 +18,13 @@ RUN npm run build
 
 # --- serve stage ---
 FROM nginx:alpine
+
+# curl for the Docker healthcheck in docker-compose.yml -- not assuming
+# busybox's wget is present/behaves as expected (it wasn't reliable in
+# practice: docker-validate.yml's frontend container reported "unhealthy"
+# with a wget-based check even once nginx was clearly serving requests).
+RUN apk add --no-cache curl
+
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
