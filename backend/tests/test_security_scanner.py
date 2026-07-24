@@ -132,6 +132,40 @@ def test_still_flags_bare_eval_at_start_of_expression(tmp_path):
     assert kinds.count("dangerous_execution") == 1
 
 
+def test_does_not_flag_comment_lines_describing_dangerous_patterns(tmp_path):
+    # Regression test found by running Atlas on its own source: comments
+    # *explaining* what eval()/exec()/pickle.load()/yaml.load() detection
+    # does (this file's own docstrings) were flagged as if they were live
+    # dangerous code, since the regexes match raw text with no comment
+    # awareness. Real code on another line in the same file must still be
+    # flagged -- this isn't exempting the file, just full-comment lines.
+    files = [
+        _file(
+            "scanner_notes.py",
+            "# eval() and exec() calls, plus pickle.load()/yaml.load() are risky\n"
+            "eval(user_input)\n",
+            tmp_path,
+        )
+    ]
+
+    report = scan_files(files)
+
+    assert len(report.issues) == 1
+    assert report.issues[0].line == 2
+
+
+def test_still_flags_a_commented_out_secret(tmp_path):
+    # Unlike dangerous-execution comments above, a commented-out secret is
+    # still a real leaked value sitting in the file (and git history) --
+    # the comment-line exemption intentionally does not apply here.
+    files = [_file("config.py", '# api_key = "sk_live_1234567890abcdef"\n', tmp_path)]
+
+    report = scan_files(files)
+
+    kinds = [i.kind for i in report.issues]
+    assert "hardcoded_secret" in kinds
+
+
 def test_detects_js_child_process_exec(tmp_path):
     files = [
         FileSymbols(

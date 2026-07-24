@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path, PurePath
 
-from .code_parser import FileSymbols
+from .code_parser import FileSymbols, language_for
 from .models import SecurityIssue, SecurityReport
 
 # Real-world validation (2026-07-24) found the majority of "critical"/
@@ -55,6 +55,27 @@ _PY_YAML_LOAD_BARE = re.compile(r"\byaml\.load\s*\(((?!.*Loader).)*\)")
 
 _MAX_SCAN_BYTES = 2 * 1024 * 1024
 
+_COMMENT_PREFIX_BY_LANGUAGE = {
+    "python": "#",
+    "javascript": "//",
+    "typescript": "//",
+    "tsx": "//",
+}
+
+
+def _is_full_line_comment(line: str, language: str | None) -> bool:
+    # Found by running Atlas on its own source: security_scanner.py's own
+    # comments *about* eval()/exec()/pickle.load() (explaining what these
+    # checks detect) were themselves flagged as dangerous_execution/
+    # unsafe_deserialization findings, since the regexes match raw text
+    # regardless of whether it's live code or prose describing it. Only
+    # applied to the execution/deserialization checks below, not secret
+    # detection -- a commented-out secret is still a real leaked value
+    # sitting in the file (and git history), so that class of finding
+    # should stay live even inside a comment.
+    prefix = _COMMENT_PREFIX_BY_LANGUAGE.get(language or "")
+    return bool(prefix) and line.strip().startswith(prefix)
+
 
 def scan_files(files: list[FileSymbols]) -> SecurityReport:
     issues: list[SecurityIssue] = []
@@ -64,18 +85,19 @@ def scan_files(files: list[FileSymbols]) -> SecurityReport:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        file_issues = _scan_text(f.path, text)
+        file_issues = _scan_text(f.path, text, language_for(path))
         if _looks_like_test_path(f.path):
             file_issues = [_demote_test_path_issue(i) for i in file_issues]
         issues.extend(file_issues)
     return SecurityReport(issues=issues)
 
 
-def _scan_text(path: str, text: str) -> list[SecurityIssue]:
+def _scan_text(path: str, text: str, language: str | None = None) -> list[SecurityIssue]:
     issues: list[SecurityIssue] = []
     lines = text.splitlines()
 
     for i, line in enumerate(lines, start=1):
+        is_comment = _is_full_line_comment(line, language)
         if _AWS_ACCESS_KEY.search(line):
             issues.append(
                 SecurityIssue(
@@ -97,7 +119,7 @@ def _scan_text(path: str, text: str) -> list[SecurityIssue]:
                 )
             )
 
-        if _PY_SUBPROCESS_SHELL_TRUE.search(line):
+        if not is_comment and _PY_SUBPROCESS_SHELL_TRUE.search(line):
             issues.append(
                 SecurityIssue(
                     file=path,
@@ -107,7 +129,7 @@ def _scan_text(path: str, text: str) -> list[SecurityIssue]:
                     severity="important",
                 )
             )
-        if _PY_OS_SYSTEM.search(line):
+        if not is_comment and _PY_OS_SYSTEM.search(line):
             issues.append(
                 SecurityIssue(
                     file=path,
@@ -117,17 +139,18 @@ def _scan_text(path: str, text: str) -> list[SecurityIssue]:
                     severity="important",
                 )
             )
-        for match in _PY_EVAL_EXEC.finditer(line):
-            issues.append(
-                SecurityIssue(
-                    file=path,
-                    line=i,
-                    kind="dangerous_execution",
-                    message=f"{match.group(1)}() on untrusted input can execute arbitrary code",
-                    severity="important",
+        if not is_comment:
+            for match in _PY_EVAL_EXEC.finditer(line):
+                issues.append(
+                    SecurityIssue(
+                        file=path,
+                        line=i,
+                        kind="dangerous_execution",
+                        message=f"{match.group(1)}() on untrusted input can execute arbitrary code",
+                        severity="important",
+                    )
                 )
-            )
-        if _JS_CHILD_PROCESS_EXEC.search(line):
+        if not is_comment and _JS_CHILD_PROCESS_EXEC.search(line):
             issues.append(
                 SecurityIssue(
                     file=path,
@@ -138,7 +161,7 @@ def _scan_text(path: str, text: str) -> list[SecurityIssue]:
                 )
             )
 
-        if _PY_PICKLE_LOADS.search(line):
+        if not is_comment and _PY_PICKLE_LOADS.search(line):
             issues.append(
                 SecurityIssue(
                     file=path,
@@ -148,7 +171,7 @@ def _scan_text(path: str, text: str) -> list[SecurityIssue]:
                     severity="important",
                 )
             )
-        if _PY_YAML_LOAD_BARE.search(line):
+        if not is_comment and _PY_YAML_LOAD_BARE.search(line):
             issues.append(
                 SecurityIssue(
                     file=path,
