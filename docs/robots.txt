@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://justin300507.github.io/atlas/sitemap.xml
