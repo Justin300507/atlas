@@ -6,6 +6,7 @@ from app.code_parser import FileSymbols
 from app.doc_generator import generate_documentation
 from app.models import (
     ArchitectureHealth,
+    CouplingIssue,
     DebtModule,
     FileChurn,
     FileCoverage,
@@ -132,6 +133,38 @@ def test_api_reference_lists_routes_with_relative_paths():
     assert "GET" in doc and "/users" in doc
     assert "app/main.py" in doc
     assert str(REPO_ROOT) not in doc
+
+
+def test_api_reference_excludes_routes_from_test_and_fixture_paths():
+    # Regression test: routes defined in test/fixture files (mock servers,
+    # reliability harnesses) aren't part of the production API. Reported
+    # against a real 440-file repo whose API Reference included
+    # backend/tests/reliability/... routes (2026-07-24).
+    files = [
+        _file("app/main.py", routes=[("GET", "/users")]),
+        _file("tests/reliability/mock_server.py", routes=[("GET", "/fake")]),
+        _file("app/test_helpers.py", routes=[("POST", "/also-fake")]),
+    ]
+    graph = nx.DiGraph()
+
+    doc = generate_documentation(REPO_ROOT, StackReport(), files, graph, _empty_quality(), _empty_security(), _empty_git())
+
+    section = doc.split("## API Reference")[1].split("## ")[0]
+    assert "/users" in section
+    assert "/fake" not in section
+    assert "/also-fake" not in section
+    assert "2 additional route(s) found only in test/fixture paths" in section
+
+
+def test_api_reference_reports_no_production_routes_when_only_test_routes_exist():
+    files = [_file("tests/mock_server.py", routes=[("GET", "/fake")])]
+    graph = nx.DiGraph()
+
+    doc = generate_documentation(REPO_ROOT, StackReport(), files, graph, _empty_quality(), _empty_security(), _empty_git())
+
+    section = doc.split("## API Reference")[1].split("## ")[0]
+    assert "No production routes detected." in section
+    assert "1 additional route(s)" in section
 
 
 def test_directory_guide_groups_by_top_level_directory():
@@ -331,6 +364,47 @@ def test_dependency_diagram_caps_at_40_nodes_with_note():
     assert "capped for readability" in doc
 
 
+def test_dependency_diagram_shows_system_overview_when_capped_and_cross_directory():
+    # Regression test: fitting dozens of modules into one Mermaid diagram
+    # becomes unreadable for large repos -- render a directory-level system
+    # overview first. Reported against a real 440-file repo (2026-07-24).
+    graph = nx.DiGraph()
+    for i in range(45):
+        subdir = "backend" if i % 2 == 0 else "frontend"
+        graph.add_node(str(REPO_ROOT / subdir / f"mod_{i}.py"), type="module")
+    for i in range(44):
+        subdir_a = "backend" if i % 2 == 0 else "frontend"
+        subdir_b = "backend" if (i + 1) % 2 == 0 else "frontend"
+        graph.add_edge(
+            str(REPO_ROOT / subdir_a / f"mod_{i}.py"),
+            str(REPO_ROOT / subdir_b / f"mod_{i + 1}.py"),
+            type="import",
+        )
+
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], graph, _empty_quality(), _empty_security(), _empty_git())
+
+    section = doc.split("## Dependency Diagram")[1]
+    assert "**System Overview**" in section
+    assert "**Detailed Module Diagram**" in section
+    assert section.count("```mermaid") == 2
+    assert '["backend"]' in section
+    assert '["frontend"]' in section
+
+
+def test_dependency_diagram_omits_system_overview_when_not_capped():
+    a = str(REPO_ROOT / "backend" / "a.py")
+    b = str(REPO_ROOT / "frontend" / "b.py")
+    graph = nx.DiGraph()
+    graph.add_node(a, type="module")
+    graph.add_node(b, type="module")
+    graph.add_edge(a, b, type="import")
+
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], graph, _empty_quality(), _empty_security(), _empty_git())
+
+    section = doc.split("## Dependency Diagram")[1].split("## ")[0]
+    assert "System Overview" not in section
+
+
 def test_dependency_diagram_ranks_by_import_degree_not_route_degree():
     graph = nx.DiGraph()
     chain = [str(REPO_ROOT / f"mod_{i}.py") for i in range(40)]
@@ -368,6 +442,7 @@ def test_empty_repo_renders_without_crashing():
         "## Security Findings",
         "## Recent High-Churn Components",
         "## Analysis Coverage",
+        "## Executive Recommendations",
     ):
         assert header in doc
 
@@ -523,3 +598,92 @@ def test_analysis_coverage_footer_discloses_support_and_limitations():
     assert "can't be resolved statically" in doc
     assert "pattern-based" in doc
     assert "heuristic engineering signals" in doc
+
+
+def test_executive_recommendations_says_so_when_nothing_flagged():
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git(),
+        semantic=_single_module_semantic(),
+    )
+
+    assert "## Executive Recommendations" in doc
+    assert "No significant priorities identified" in doc
+
+
+def test_executive_recommendations_synthesizes_debt_coupling_functions_and_cycles():
+    # Regression test: requested a concluding action-plan section rather
+    # than leaving the report a pure diagnostic dump. Every line here must
+    # trace back to a finding already shown elsewhere -- no invented
+    # judgment calls. Reported (2026-07-24).
+    semantic = SemanticReport(
+        architecture_health=ArchitectureHealth(
+            module_count=5, import_edge_count=8, circular_cluster_count=3,
+            articulation_point_count=0, bridge_count=0, betweenness_computed=True,
+            dependency_concentration_top5_ratio=0.5,
+        ),
+        critical_modules=[],
+        subsystem_overview=SubsystemOverview(confident=False, coverage_ratio=0.0, layer_counts={}, layer_edges=[]),
+        hotspots=[],
+        coupling_issues=[
+            CouplingIssue(file="main.py", kind="god_module", message="fan-out 39 across 68 functions", severity="important"),
+        ],
+        architectural_smells=[],
+    )
+    debt = TechnicalDebtReport(
+        average_debt_score=10.0,
+        top_debt_modules=[
+            DebtModule(file="patcher.py", debt_score=42.0, category="complexity_churn", confidence="high", evidence=["x"]),
+        ],
+        recommended_refactoring_order=["patcher.py"],
+    )
+    performance = PerformanceReport(
+        findings=[
+            PerformanceFinding(file="a.py", line=1, kind="very_large_function", message="x", confidence="high"),
+            PerformanceFinding(file="b.py", line=1, kind="very_large_function", message="x", confidence="high"),
+        ],
+        bottleneck_modules=[],
+    )
+
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git(),
+        semantic=semantic, debt=debt, performance=performance,
+    )
+
+    section = doc.split("## Executive Recommendations")[1]
+    assert "patcher.py" in section
+    assert "42.00" in section
+    assert "main.py" in section
+    assert "2 function(s) flagged as very large" in section
+    assert "3 circular-dependency clusters" in section
+
+
+def test_executive_recommendations_does_not_duplicate_a_file_already_named_for_debt():
+    semantic = SemanticReport(
+        architecture_health=ArchitectureHealth(
+            module_count=1, import_edge_count=0, circular_cluster_count=0,
+            articulation_point_count=0, bridge_count=0, betweenness_computed=True,
+            dependency_concentration_top5_ratio=0.0,
+        ),
+        critical_modules=[],
+        subsystem_overview=SubsystemOverview(confident=False, coverage_ratio=0.0, layer_counts={}, layer_edges=[]),
+        hotspots=[],
+        coupling_issues=[
+            CouplingIssue(file="main.py", kind="god_module", message="fan-out 39", severity="important"),
+        ],
+        architectural_smells=[],
+    )
+    debt = TechnicalDebtReport(
+        average_debt_score=10.0,
+        top_debt_modules=[
+            DebtModule(file="main.py", debt_score=10.0, category="coupling_smell", confidence="high", evidence=["x"]),
+        ],
+        recommended_refactoring_order=["main.py"],
+    )
+
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git(),
+        semantic=semantic, debt=debt,
+    )
+
+    section = doc.split("## Executive Recommendations")[1]
+    assert section.count("main.py") == 1

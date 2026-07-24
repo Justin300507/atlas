@@ -31,6 +31,22 @@ def test_route_pattern_inside_a_string_literal_is_not_extracted_as_a_real_route(
     assert symbols.routes == []
 
 
+def test_route_pattern_inside_a_comment_is_not_extracted_as_a_real_route(tmp_path):
+    # Regression test found via dogfooding on Atlas's own code_parser.py:
+    # the fix for routes-inside-string-literals didn't cover comments,
+    # since tree-sitter comment nodes aren't string nodes -- this file's
+    # own docstring-style comments describing that fix (containing example
+    # text like "@app.get(...)") were themselves extracted as fake routes
+    # (2026-07-24).
+    path = tmp_path / "commented.py"
+    path.write_text('# See the real decorator: @app.get("/users")\ndef f():\n    pass\n')
+
+    symbols = parse_file(path)
+
+    assert symbols is not None
+    assert symbols.routes == []
+
+
 def test_parse_js_file_extracts_imports_defs_and_routes():
     symbols = parse_file(FIXTURES / "js_symbols" / "sample.js")
     assert symbols is not None

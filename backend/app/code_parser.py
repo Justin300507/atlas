@@ -133,13 +133,23 @@ def _extract_defined(root, source: bytes, lang: str) -> list[str]:
     return defined
 
 
-def _string_node_byte_ranges(root) -> list[tuple[int, int]]:
+_NON_CODE_NODE_TYPES = {"string", "comment"}
+
+
+def _non_code_byte_ranges(root) -> list[tuple[int, int]]:
+    """Byte ranges of string-literal AND comment nodes -- anywhere a
+    route-shaped pattern can appear as text without being executable code.
+    Comments were missed by an earlier version of this function that only
+    excluded strings: caught by dogfooding on Atlas's own code_parser.py,
+    whose docstring-style comments explaining this exact feature (e.g.
+    "a real `@app.get(...)` decorator") matched the route regex, since
+    tree-sitter comments aren't string nodes (2026-07-24)."""
     ranges: list[tuple[int, int]] = []
 
     def walk(node):
-        if node.type == "string":
+        if node.type in _NON_CODE_NODE_TYPES:
             ranges.append((node.start_byte, node.end_byte))
-            return  # nothing inside a string literal needs separate matching
+            return  # nothing inside a string/comment needs separate matching
         for child in node.children:
             walk(child)
 
@@ -150,17 +160,19 @@ def _string_node_byte_ranges(root) -> list[tuple[int, int]]:
 def _extract_routes(root, source: bytes) -> list[tuple[str, str]]:
     # A raw regex scan over the whole file can't distinguish a real
     # `@app.get("/x")` decorator from the same text appearing inside a
-    # string literal -- e.g. an LLM prompt template embedding example API
-    # code as documentation. A real decorator's own path argument is a
-    # *separate*, later string node than the "@app.get(" text itself, so
-    # excluding matches whose start falls inside *any* string node's byte
-    # range filters out the embedded-in-a-string case without touching
-    # real decorators. Reported against a real repo where routes were
-    # extracted from *_prompt.py files (2026-07-24).
-    string_ranges = _string_node_byte_ranges(root)
+    # string literal or comment -- e.g. an LLM prompt template embedding
+    # example API code as documentation, or a comment describing this
+    # exact feature. A real decorator's own path argument is a *separate*,
+    # later string node than the "@app.get(" text itself, so excluding
+    # matches whose start falls inside *any* string/comment node's byte
+    # range filters out both cases without touching real decorators.
+    # Reported against a real repo where routes were extracted from
+    # *_prompt.py files, then again via dogfooding when this file's own
+    # comments were flagged (2026-07-24).
+    excluded_ranges = _non_code_byte_ranges(root)
     routes: list[tuple[str, str]] = []
     for m in _ROUTE_PATTERN.finditer(source):
-        if any(start <= m.start() < end for start, end in string_ranges):
+        if any(start <= m.start() < end for start, end in excluded_ranges):
             continue
         routes.append((m.group(1).decode("ascii").upper(), m.group(2).decode("utf-8", errors="ignore")))
     return routes

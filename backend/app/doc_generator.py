@@ -21,6 +21,7 @@ from .models import (
     StackReport,
     TechnicalDebtReport,
 )
+from .security_scanner import _looks_like_test_path
 from .semantic_analysis import _LAYER_ORDER
 
 _DIAGRAM_NODE_CAP = 40
@@ -59,7 +60,7 @@ def generate_documentation(
         [
             _directory_guide(repo_root, files),
             _api_reference(repo_root, files),
-            _dependency_diagram(graph),
+            _dependency_diagram(repo_root, graph),
             _risk_areas(repo_root, quality),
         ]
     )
@@ -75,6 +76,7 @@ def generate_documentation(
             _security_findings(repo_root, security),
             _high_churn_components(git_report),
             _analysis_coverage(),
+            _executive_recommendations(semantic, debt, performance),
         ]
     )
     return "\n\n".join(sections) + "\n"
@@ -468,23 +470,80 @@ def _directory_guide(repo_root: Path, files: list[FileSymbols]) -> str:
 
 def _api_reference(repo_root: Path, files: list[FileSymbols]) -> str:
     lines = ["## API Reference", ""]
+    all_rows = [(method, path, f) for f in files for method, path in f.routes]
+
+    # Routes defined in test/fixture files (mock servers, reliability
+    # harnesses, example endpoints) aren't part of the production API a
+    # caller would actually hit -- reuses security_scanner's own test-path
+    # heuristic rather than inventing a second one. Reported against a real
+    # 440-file repo whose API Reference included backend/tests/
+    # reliability/... routes (2026-07-24).
     rows = [
         (method, path, _relative(repo_root, f.path))
-        for f in files
-        for method, path in f.routes
+        for method, path, f in all_rows
+        if not _looks_like_test_path(f.path)
     ]
+    excluded = len(all_rows) - len(rows)
+    exclusion_note = (
+        f"_{excluded} additional route(s) found only in test/fixture paths -- "
+        "excluded as not part of the production API._"
+        if excluded
+        else None
+    )
+
     if not rows:
-        lines.append("No routes detected.")
+        lines.append("No production routes detected.")
+        if exclusion_note:
+            lines.append("")
+            lines.append(exclusion_note)
         return "\n".join(lines)
 
     lines.append("| Method | Path | File |")
     lines.append("|---|---|---|")
     for method, path, file in sorted(rows, key=lambda r: (r[2], r[1])):
         lines.append(f"| {method} | {path} | {file} |")
+    if exclusion_note:
+        lines.append("")
+        lines.append(exclusion_note)
     return "\n".join(lines)
 
 
-def _dependency_diagram(graph: nx.DiGraph) -> str:
+def _system_overview_diagram(repo_root: Path, graph: nx.DiGraph) -> str:
+    """A directory-level rollup of the import graph -- one node per
+    top-level directory, edges labeled with the number of import edges
+    crossing between them. Shown only when the detailed module diagram is
+    large enough to be capped, since that's exactly when a single
+    module-level diagram stops being readable. Reported: "for repositories
+    this large, render two graphs" (2026-07-24)."""
+    module_nodes = [n for n, d in graph.nodes(data=True) if d.get("type") == "module"]
+    dir_of: dict[str, str] = {}
+    for n in module_nodes:
+        rel = _relative(repo_root, n)
+        parts = rel.split("/")
+        dir_of[n] = parts[0] if len(parts) > 1 else "."
+
+    edge_counts: dict[tuple[str, str], int] = {}
+    for u, v, d in graph.edges(data=True):
+        if d.get("type") != "import" or u not in dir_of or v not in dir_of:
+            continue
+        du, dv = dir_of[u], dir_of[v]
+        if du == dv:
+            continue  # only cross-directory structure belongs in an overview
+        edge_counts[(du, dv)] = edge_counts.get((du, dv), 0) + 1
+
+    if not edge_counts:
+        return ""
+
+    dir_names = sorted({d for pair in edge_counts for d in pair})
+    node_ids = {d: f"d{i}" for i, d in enumerate(dir_names)}
+    lines = ["```mermaid", "graph TD"]
+    for (du, dv), count in sorted(edge_counts.items()):
+        lines.append(f'    {node_ids[du]}["{du}"] -->|"{count}"| {node_ids[dv]}["{dv}"]')
+    lines.append("```")
+    return "\n".join(lines)
+
+
+def _dependency_diagram(repo_root: Path, graph: nx.DiGraph) -> str:
     module_nodes = [n for n, d in graph.nodes(data=True) if d.get("type") == "module"]
     lines = ["## Dependency Diagram", ""]
     if not module_nodes:
@@ -507,6 +566,24 @@ def _dependency_diagram(graph: nx.DiGraph) -> str:
     selected = sorted(module_nodes, key=lambda n: (-import_degree[n], n))[:_DIAGRAM_NODE_CAP]
     selected_set = set(selected)
     node_ids = {n: f"n{i}" for i, n in enumerate(selected)}
+    is_capped = len(module_nodes) > _DIAGRAM_NODE_CAP
+
+    if is_capped:
+        overview = _system_overview_diagram(repo_root, graph)
+        if overview:
+            lines.append(
+                "This repository is large enough that a single module-level "
+                "diagram isn't readable on its own -- a directory-level "
+                "**System Overview** is shown first, followed by the "
+                "**Detailed Module Diagram** below it."
+            )
+            lines.append("")
+            lines.append("**System Overview**")
+            lines.append("")
+            lines.append(overview)
+            lines.append("")
+            lines.append("**Detailed Module Diagram**")
+            lines.append("")
 
     lines.append("```mermaid")
     lines.append("graph TD")
@@ -517,7 +594,7 @@ def _dependency_diagram(graph: nx.DiGraph) -> str:
             )
     lines.append("```")
 
-    if len(module_nodes) > _DIAGRAM_NODE_CAP:
+    if is_capped:
         lines.append("")
         lines.append(
             f"_({len(selected)} of {len(module_nodes)} modules shown, capped for readability)_"
@@ -606,6 +683,70 @@ def _high_churn_components(git_report: GitIntelligenceReport) -> str:
     lines.append("|---|---|---|")
     for churn in top:
         lines.append(f"| {churn.file} | {churn.commit_count} | {churn.bug_fix_count} |")
+    return "\n".join(lines)
+
+
+def _executive_recommendations(
+    semantic: SemanticReport | None,
+    debt: TechnicalDebtReport | None,
+    performance: PerformanceReport | None,
+) -> str:
+    # A closing action list, not a new analysis -- every line here points
+    # back to a finding already shown elsewhere in this report. No new
+    # judgment calls (e.g. never labels a file "an orchestrator" -- Atlas
+    # doesn't know what a file does, only what its measured signals are).
+    # Requested: "turn the report from a diagnostic document into an
+    # action plan" (2026-07-24).
+    lines = ["## Executive Recommendations", ""]
+    items: list[str] = []
+    named_files: set[str] = set()
+
+    if debt is not None and debt.top_debt_modules:
+        top = debt.top_debt_modules[0]
+        items.append(
+            f"Reduce technical debt in `{top.file}` -- the highest-scored module "
+            f"({top.debt_score:.2f}), driven primarily by {top.category}."
+        )
+        named_files.add(top.file)
+
+    if semantic is not None:
+        god_modules = [
+            c for c in semantic.coupling_issues if c.kind == "god_module" and c.file not in named_files
+        ]
+        if god_modules:
+            top_god = god_modules[0]
+            items.append(f"Refactor `{top_god.file}` to reduce coupling -- {top_god.message}.")
+            named_files.add(top_god.file)
+
+    if performance is not None:
+        large_functions = [f for f in performance.findings if f.kind == "very_large_function"]
+        if large_functions:
+            items.append(
+                f"Break down the {len(large_functions)} function(s) flagged as very large "
+                "(see Performance Analysis for the full list)."
+            )
+
+    if semantic is not None and semantic.architecture_health.circular_cluster_count > 0:
+        n = semantic.architecture_health.circular_cluster_count
+        items.append(
+            f"Address the {n} circular-dependency cluster{'s' if n != 1 else ''} "
+            "(see Architecture Health)."
+        )
+
+    if not items:
+        lines.append(
+            "No significant priorities identified -- no god modules, very-large "
+            "functions, circular-dependency clusters, or high-debt modules were flagged."
+        )
+        return "\n".join(lines)
+
+    lines.append(
+        "Derived directly from findings shown elsewhere in this report, ordered by which "
+        "signal was strongest -- not a separate judgment call."
+    )
+    lines.append("")
+    for item in items:
+        lines.append(f"- {item}")
     return "\n".join(lines)
 
 
