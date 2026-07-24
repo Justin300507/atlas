@@ -149,6 +149,47 @@ def test_try_create_job_is_atomic_under_concurrent_callers(tmp_path):
     assert count_active_jobs(db_path=db_path) == max_active
 
 
+def test_connections_use_wal_mode(tmp_path):
+    # Direct, deterministic check of the actual fix for a real CI failure
+    # ("database is locked" under _MAX_ACTIVE_JOBS concurrent job
+    # pipelines) -- unlike the stress test below, this doesn't depend on
+    # reproducing timing-sensitive lock contention (confirmed locally: the
+    # stress test still passes even with the fix reverted, since this
+    # machine's fast local disk and thread scheduling don't naturally
+    # reproduce what a loaded CI runner hit). WAL mode is what actually
+    # changed; check it took effect directly.
+    from app.jobs import _connect
+
+    conn = _connect(tmp_path / "jobs.db")
+    try:
+        mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        assert mode.lower() == "wal"
+    finally:
+        conn.close()
+
+
+def test_many_concurrent_update_job_calls_do_not_raise_database_locked(tmp_path):
+    # Stress-test coverage for the same fix as test_connections_use_wal_mode
+    # above -- hits update_job() directly with real threads and far more
+    # concurrent writers than production ever has. Passes with or without
+    # the fix on this machine (see that test's comment for why), so it's
+    # not a guaranteed reproduction of the original CI failure, but it's
+    # still real concurrent-write coverage worth keeping.
+    db_path = tmp_path / "jobs.db"
+    job_id = create_job("https://github.com/example/repo", db_path=db_path)
+    write_count = 100
+
+    def write(i: int) -> None:
+        update_job(job_id, stage=f"stage_{i}", db_path=db_path)
+
+    with ThreadPoolExecutor(max_workers=write_count) as pool:
+        list(pool.map(write, range(write_count)))
+
+    record = get_job(job_id, db_path=db_path)
+    assert record is not None
+    assert record.stage is not None
+
+
 def test_cleanup_stale_jobs_removes_only_finished_jobs_older_than_max_age(tmp_path):
     db_path = tmp_path / "jobs.db"
 

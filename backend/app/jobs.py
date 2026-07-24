@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -45,9 +46,39 @@ def _resolve_db_path(db_path: Path | None) -> Path:
     return db_path if db_path is not None else DEFAULT_DB_PATH
 
 
+_WAL_SWITCH_RETRIES = 5
+_WAL_SWITCH_RETRY_DELAY_SECONDS = 0.05
+
+
 def _connect(db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    # Found via a real CI failure under concurrent load (_MAX_ACTIVE_JOBS=8
+    # jobs, 4 of them truly parallel via _JOB_EXECUTOR, each opening a fresh
+    # connection per update_job() call across ~10 writes over its
+    # pipeline): sqlite3.connect()'s default 5s busy-timeout wasn't always
+    # enough headroom on a loaded runner, raising "database is locked".
+    # WAL mode lets readers (get_job/count_active_jobs polling) proceed
+    # without blocking on an in-progress writer, which is the actual
+    # source of contention here, not a logic race -- try_create_job's
+    # atomicity (see its own docstring) is unaffected by either change.
+    conn = sqlite3.connect(db_path, timeout=30.0)
+    # Switching a brand-new file to WAL mode is itself a write (it creates
+    # the -wal/-shm sidecar files) -- found immediately by this fix's own
+    # test suite: 40 threads all calling _connect() on a fresh db file
+    # for the first time can collide on that switch and raise "database is
+    # locked" right away, faster than the connection's busy-timeout kicks
+    # in (a Windows file-locking rough edge, not something the timeout
+    # parameter alone covers). Once any connection succeeds, the mode is
+    # stored in the file itself, so this retry only ever matters during
+    # that brief first-initialization window.
+    for attempt in range(_WAL_SWITCH_RETRIES):
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            break
+        except sqlite3.OperationalError:
+            if attempt == _WAL_SWITCH_RETRIES - 1:
+                raise
+            time.sleep(_WAL_SWITCH_RETRY_DELAY_SECONDS)
     conn.execute(_CREATE_TABLE_SQL)
     return conn
 
