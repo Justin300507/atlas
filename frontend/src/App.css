@@ -15,6 +15,24 @@
   margin: 0.75rem 0 1rem;
 }
 
+.compare-button {
+  margin: 0 0 1rem 0.5rem;
+}
+
+.comparison {
+  border: 1px solid var(--border, #ccc);
+  border-radius: 6px;
+  padding: 0 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.comparison-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .tagline {
   color: var(--text);
   max-width: 46ch;

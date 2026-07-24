@@ -343,4 +343,104 @@ describe("App", () => {
     });
     expect(screen.queryByText("NaNs elapsed")).not.toBeInTheDocument();
   });
+
+  it("records a completed job into job history for future comparisons", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith("/jobs")) return jsonResponse({ job_id: "abc123" });
+      return jsonResponse({
+        id: "abc123",
+        status: "done",
+        stage: "generating_documentation",
+        markdown: "## Executive Summary\n\nhello",
+        error: null,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App pollIntervalMs={5} />);
+    fireEvent.change(screen.getByPlaceholderText(/github.com/i), {
+      target: { value: "https://github.com/example/example" },
+    });
+    fireEvent.click(screen.getByText("Analyze"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Executive Summary")).toBeInTheDocument();
+    });
+
+    const history = JSON.parse(localStorage.getItem("atlas.jobHistory")!);
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({ jobId: "abc123", repoUrl: "https://github.com/example/example" });
+  });
+
+  it("does not show a Compare button when there is no prior job for this repo", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith("/jobs")) return jsonResponse({ job_id: "abc123" });
+      return jsonResponse({
+        id: "abc123",
+        status: "done",
+        stage: "generating_documentation",
+        markdown: "## Executive Summary\n\nhello",
+        error: null,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App pollIntervalMs={5} />);
+    fireEvent.change(screen.getByPlaceholderText(/github.com/i), {
+      target: { value: "https://github.com/example/example" },
+    });
+    fireEvent.click(screen.getByText("Analyze"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Executive Summary")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Compare with Previous Run")).not.toBeInTheDocument();
+  });
+
+  it("shows a Compare button when a prior completed job exists for the same repo, fetches and renders the comparison, and hides it again", async () => {
+    // Regression coverage for the requested trend-tracking feature: POST
+    // /compare already existed on the backend but had no frontend surface
+    // at all -- users asking for "show me the trend across runs" couldn't
+    // reach it. Reported (2026-07-24).
+    localStorage.setItem(
+      "atlas.jobHistory",
+      JSON.stringify([
+        { jobId: "prev123", repoUrl: "https://github.com/example/example", completedAt: new Date().toISOString() },
+      ])
+    );
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url.endsWith("/compare")) {
+        expect(JSON.parse(init!.body as string)).toEqual({ job_id_a: "prev123", job_id_b: "abc123" });
+        return jsonResponse({ markdown: "## Executive Summary\n\nRegressions found: 0", comparison: {} });
+      }
+      if (url.endsWith("/jobs")) return jsonResponse({ job_id: "abc123" });
+      return jsonResponse({
+        id: "abc123",
+        status: "done",
+        stage: "generating_documentation",
+        markdown: "## Executive Summary\n\nhello",
+        error: null,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App pollIntervalMs={5} />);
+    fireEvent.change(screen.getByPlaceholderText(/github.com/i), {
+      target: { value: "https://github.com/example/example" },
+    });
+    fireEvent.click(screen.getByText("Analyze"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Compare with Previous Run")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("Compare with Previous Run"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Regressions found: 0")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Comparison with Previous Run")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Hide Comparison"));
+    expect(screen.queryByText("Regressions found: 0")).not.toBeInTheDocument();
+  });
 });

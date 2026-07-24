@@ -36,3 +36,20 @@ export async function getJob(jobId: string): Promise<JobRecord> {
   }
   return resp.json();
 }
+
+export interface CompareResponse {
+  markdown: string;
+}
+
+export async function compareJobs(jobIdA: string, jobIdB: string): Promise<CompareResponse> {
+  const resp = await fetch(`${API_BASE}/compare`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_id_a: jobIdA, job_id_b: jobIdB }),
+  });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({ detail: null }));
+    throw new Error(body.detail || `Request failed with status ${resp.status}`);
+  }
+  return resp.json();
+}

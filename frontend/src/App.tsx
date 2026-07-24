@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import "./App.css";
-import { createJob, getJob, JobNotFoundError, type JobRecord } from "./api";
+import { compareJobs, createJob, getJob, JobNotFoundError, type JobRecord } from "./api";
 import { MarkdownReport } from "./MarkdownReport";
 
 // The backend clones the repo once (deep enough to cover both structure and
@@ -71,6 +71,52 @@ function clearActiveJob() {
   }
 }
 
+// A small history of completed jobs per repo URL, so a later run against
+// the same repo can offer "Compare with Previous Run" -- backed by the
+// existing POST /compare endpoint, which had no frontend surface at all
+// before this. Capped so a repo analyzed repeatedly doesn't grow
+// localStorage without bound; only the most recent entries matter for
+// "compare against the last run."
+const JOB_HISTORY_KEY = "atlas.jobHistory";
+const MAX_HISTORY_ENTRIES = 50;
+
+interface HistoryEntry {
+  jobId: string;
+  repoUrl: string;
+  completedAt: string;
+}
+
+function loadJobHistory(): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(JOB_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (e): e is HistoryEntry =>
+        typeof e?.jobId === "string" && typeof e?.repoUrl === "string" && typeof e?.completedAt === "string"
+    );
+  } catch {
+    return [];
+  }
+}
+
+function recordCompletedJob(jobId: string, repoUrl: string) {
+  try {
+    const history = loadJobHistory();
+    history.push({ jobId, repoUrl, completedAt: new Date().toISOString() });
+    localStorage.setItem(JOB_HISTORY_KEY, JSON.stringify(history.slice(-MAX_HISTORY_ENTRIES)));
+  } catch {
+    // localStorage unavailable (private mode, quota) -- history is best-effort
+  }
+}
+
+// Most recent *other* completed job for the same repo URL, if any.
+function findPreviousJob(repoUrl: string, excludeJobId: string): HistoryEntry | null {
+  const matches = loadJobHistory().filter((e) => e.repoUrl === repoUrl && e.jobId !== excludeJobId);
+  return matches.length > 0 ? matches[matches.length - 1] : null;
+}
+
 function App({ pollIntervalMs = 1000 }: AppProps) {
   const [repoUrl, setRepoUrl] = useState("");
   const [view, setView] = useState<ViewState>("idle");
@@ -78,6 +124,9 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [comparison, setComparison] = useState<string | null>(null);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [comparing, setComparing] = useState(false);
   const pollRef = useRef<number | null>(null);
   const timerRef = useRef<number | null>(null);
   const hasCheckedRecovery = useRef(false);
@@ -94,7 +143,7 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
     if (timerRef.current) window.clearInterval(timerRef.current);
   }
 
-  function startTracking(jobId: string, initialElapsedSeconds: number) {
+  function startTracking(jobId: string, initialElapsedSeconds: number, repoUrlForHistory: string) {
     stopTimers(); // never let a stale poll/timer pair from a prior job outlive this one
     setElapsedSeconds(initialElapsedSeconds);
 
@@ -109,6 +158,7 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
         if (record.status === "done" || record.status === "error") {
           stopTimers();
           clearActiveJob();
+          if (record.status === "done") recordCompletedJob(jobId, repoUrlForHistory);
           setView(record.status);
         }
       } catch {
@@ -135,6 +185,7 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
         setJob(record);
         if (record.status === "done" || record.status === "error") {
           clearActiveJob();
+          if (record.status === "done") recordCompletedJob(saved.jobId, saved.repoUrl);
           setView(record.status);
           return;
         }
@@ -142,7 +193,7 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
         const elapsed = Number.isNaN(createdAtMs)
           ? 0
           : Math.max(0, Math.floor((Date.now() - createdAtMs) / 1000));
-        startTracking(saved.jobId, elapsed);
+        startTracking(saved.jobId, elapsed, saved.repoUrl);
       } catch (err) {
         if (err instanceof JobNotFoundError) {
           // The job is genuinely gone (expired, DB reset, etc.) -- give up gracefully.
@@ -152,7 +203,7 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
           // A transient failure (network blip, backend still booting) isn't proof the
           // job is gone -- keep the saved job and let the normal poll loop's own
           // dropped-request tolerance retry on the next tick.
-          startTracking(saved.jobId, 0);
+          startTracking(saved.jobId, 0, saved.repoUrl);
         }
       }
     })();
@@ -168,8 +219,10 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
       const { job_id } = await createJob(repoUrl);
       saveActiveJob(job_id, repoUrl);
       setJob(null);
+      setComparison(null);
+      setComparisonError(null);
       setView("running");
-      startTracking(job_id, 0);
+      startTracking(job_id, 0, repoUrl);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to start analysis");
     } finally {
@@ -184,9 +237,25 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
     setJob(null);
     setSubmitError(null);
     setRepoUrl("");
+    setComparison(null);
+    setComparisonError(null);
+  }
+
+  async function handleCompare(previousJobId: string, currentJobId: string) {
+    setComparing(true);
+    setComparisonError(null);
+    try {
+      const result = await compareJobs(previousJobId, currentJobId);
+      setComparison(result.markdown);
+    } catch (err) {
+      setComparisonError(err instanceof Error ? err.message : "Failed to compare runs");
+    } finally {
+      setComparing(false);
+    }
   }
 
   const currentStageIndex = job?.stage ? STAGES.indexOf(job.stage) : -1;
+  const previousJob = view === "done" && job ? findPreviousJob(repoUrl, job.id) : null;
 
   return (
     <div className="app">
@@ -249,6 +318,29 @@ function App({ pollIntervalMs = 1000 }: AppProps) {
       {view === "done" && job?.markdown && (
         <div className="report">
           <button onClick={reset}>New Analysis</button>
+          {previousJob && (
+            <button
+              onClick={() => handleCompare(previousJob.jobId, job.id)}
+              disabled={comparing}
+              className="compare-button"
+            >
+              {comparing ? "Comparing…" : "Compare with Previous Run"}
+            </button>
+          )}
+          {comparisonError && (
+            <p className="error" role="alert">
+              {comparisonError}
+            </p>
+          )}
+          {comparison && (
+            <div className="comparison">
+              <div className="comparison-header">
+                <h2>Comparison with Previous Run</h2>
+                <button onClick={() => setComparison(null)}>Hide Comparison</button>
+              </div>
+              <MarkdownReport markdown={comparison} />
+            </div>
+          )}
           <MarkdownReport markdown={job.markdown} />
         </div>
       )}
