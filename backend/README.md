@@ -94,11 +94,12 @@ single Markdown report in the response's `markdown` field: Executive Summary,
 Architecture Overview, Directory Guide, API Reference, a Mermaid Dependency Diagram
 (capped at 40 modules for readability), Risk Areas (from the quality report),
 Recent High-Churn Components (from git intelligence), and a closing Analysis
-Coverage section disclosing what's currently supported (Python and ES Module
-imports, git history, repo structure) versus known limitations (no CommonJS
-`require()` support yet; scores are heuristic signals, not guarantees). Purely
-deterministic — no LLM call, no data beyond what the other three endpoints
-already compute.
+Coverage section disclosing what's currently supported (Python, ES Module and
+CommonJS `require()` imports, git history, repo structure, security scanning)
+versus known limitations (non-literal import targets can't be resolved
+statically; scores are heuristic signals, not guarantees; large repos are
+capped — see `FAQ.md` for the full list). Purely deterministic — no LLM call,
+no data beyond what the other three endpoints already compute.
 
 ## Jobs (async analysis with progress)
 

@@ -45,5 +45,9 @@ docker build -t atlas-frontend --build-arg VITE_API_BASE=https://api.example.com
 
 ## Health check
 
-`GET /health` on the backend returns `{"status": "ok"}` — use it for
-container orchestration liveness/readiness probes.
+`GET /health` on the backend returns HTTP 200 with `{"status": "ok"}`,
+or HTTP 200 with `{"status": "degraded"}` if its database check fails —
+**the status code is always 200 either way**, so a probe that only
+checks the HTTP status won't see a degraded DB dependency as unhealthy.
+Check the response body's `status` field, not just the status code, if
+that distinction matters for your orchestration setup.

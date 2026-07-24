@@ -36,6 +36,7 @@ flowchart TD
 | `config.py` | Env-driven config (CORS origins, log level), fails fast on misconfiguration |
 | `rate_limiter.py` | In-memory sliding-window per-client rate limiter |
 | `jobs.py` | SQLite-backed async job state, atomic capacity-checked creation, cleanup |
+| `models.py` | Pydantic request/response schemas shared across endpoints |
 | `timing.py` | Per-stage wall-clock timing, logged per job |
 | `cloner.py` | Shallow / history-depth git clones into a temp dir |
 | `stack_detector.py` | Heuristic framework/DB/deployment detection |

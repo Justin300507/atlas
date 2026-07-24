@@ -1,32 +1,33 @@
-# React + TypeScript + Vite
+# Atlas Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite + TypeScript. Single-page: paste a GitHub URL, submit, poll
+job progress, render the resulting Markdown report.
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Needs the backend running (see `../backend/README.md`) and
+`VITE_API_BASE` pointed at it — see `../DEPLOYMENT.md` for the default
+and how it's baked in at build time.
+
+## Scripts
+
+```bash
+npm run dev       # dev server with HMR
+npm run build     # tsc -b && vite build
+npm run lint       # oxlint
+npm test           # vitest run
+```
+
+## Structure
+
+`src/App.tsx` (submit → poll → render), `src/MarkdownReport.tsx`
+(renders the Markdown, lazy-loads Mermaid only when a diagram is
+present). Job state persists to `localStorage` so it survives a page
+refresh — see `../docs/superpowers/specs/2026-07-23-refresh-reconnect-recovery-design.md`.
+
+See `../ARCHITECTURE.md` for how this fits into the rest of Atlas.
