@@ -156,6 +156,25 @@ def test_clean_git_error_falls_back_to_generic_message_when_empty():
     assert _clean_git_error("") == "git clone failed"
 
 
+def test_clean_git_error_translates_private_or_missing_repo_auth_prompt():
+    # Regression test: a real user pasted a private repo's URL and got a raw
+    # "terminal prompts disabled" git-internals message back (2026-07-24).
+    # GitHub answers both private and nonexistent repos with the same 401
+    # challenge over the smart-HTTP protocol, so this is the one signal
+    # available to distinguish "needs credentials" from other clone failures.
+    stderr = (
+        "Cloning into 'dest'...\n"
+        "fatal: could not read Username for 'https://github.com': terminal prompts disabled\n"
+    )
+
+    message = _clean_git_error(stderr)
+
+    assert "terminal prompts disabled" not in message
+    assert "could not read Username" not in message
+    assert "private" in message
+    assert "public GitHub repositories" in message
+
+
 def test_clone_to_error_message_is_clean_not_a_progress_dump(monkeypatch, tmp_path):
     class _FakeResult:
         returncode = 128

@@ -19,6 +19,19 @@ _GITHUB_URL_RE = re.compile(r"^https://github\.com/[\w.-]+/[\w.-]+(?:\.git)?/?$"
 # response verbatim. Surface only the meaningful fatal/error lines instead.
 _MAX_ERROR_MESSAGE_CHARS = 500
 
+# Reported by a real user (2026-07-24) pasting a private repo's URL: with
+# GIT_TERMINAL_PROMPT=0 and no stored credentials (the normal state inside
+# Atlas's container), GitHub's smart-HTTP protocol answers a private *or*
+# nonexistent repo with the same 401 challenge -- git can't prompt for
+# credentials non-interactively and fails with this exact message. It's
+# accurate but meaningless to someone who just pasted a URL into a web form,
+# so translate it into the actionable fact: only public repos work here.
+_AUTH_REQUIRED_MARKERS = ("could not read Username", "terminal prompts disabled")
+_AUTH_REQUIRED_MESSAGE = (
+    "Could not access this repository. It may be private, may not exist, or "
+    "the URL may be incorrect -- Atlas only analyzes public GitHub repositories."
+)
+
 
 class CloneError(Exception):
     pass
@@ -36,6 +49,8 @@ def validate_github_url(url: str) -> None:
 def _clean_git_error(stderr: str) -> str:
     lines = [ln for ln in stderr.strip().splitlines() if ln.startswith(("fatal:", "error:"))]
     message = "\n".join(lines) if lines else stderr.strip()
+    if any(marker in message for marker in _AUTH_REQUIRED_MARKERS):
+        return _AUTH_REQUIRED_MESSAGE
     if len(message) > _MAX_ERROR_MESSAGE_CHARS:
         message = message[:_MAX_ERROR_MESSAGE_CHARS] + " ... (truncated)"
     return message or "git clone failed"
