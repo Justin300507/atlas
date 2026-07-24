@@ -14,6 +14,7 @@ for the full story behind each fix.
 | pallets/flask | Python | ✓ | 40.5 | 76 | 83 | no | 171 | 70 | 43 | 1 | 2 | 500 (truncated) |
 | facebook/react | JavaScript | ✓ | 50.4 | 83 | 4482 | no | 3527 | 42 | 19 | 22 | 111 | 500 (truncated) |
 | expressjs/express | JavaScript (CommonJS) | ✓ | 5.5 | 82 | 141 | no | 153 | 98 | 100 | 0 | 2 | 500 (truncated) |
+| psf/requests | Python | ✓ | 5.9 | 50 | 37 | no | 105 | 76 | 59 | 1 | 7 | 500 (truncated) |
 | vercel/next.js | TypeScript (monorepo) | ✗ | — | — | — | — | — | — | — | — | — | see below |
 
 ## What this found
@@ -59,6 +60,18 @@ where this limit doesn't exist. Not fixed, since it isn't the highest
 priority use of effort — but the raw git error this used to surface
 (several hundred lines of `Updating files: NN%` progress noise) is now a
 short, clean diagnostic via `cloner.py`'s `_clean_git_error`.
+
+**Added later the same day: psf/requests.** All five repos validated so
+far are web frameworks; `requests` is a non-web-framework Python library,
+added to check the scanner/scorer generalize rather than being tuned to
+Django/Flask/FastAPI's shape specifically. Result: a real 11-module
+circular cluster (`src/requests/__init__.py` and its submodules
+importing each other — the same "package `__init__.py` re-exporting its
+submodules" pattern as Django's known cluster, not a bug), and all 7
+security findings correctly demoted to `minor` (`pickle.load()` calls
+inside `tests/test_requests.py`, which is genuinely testing cookie
+pickling, not a real risk). No new bugs found — a clean confirmation run
+rather than a bug-finding one.
 
 **Would an engineer trust these reports now?** Meaningfully more than at
 the start of this validation round. Django's report in particular went

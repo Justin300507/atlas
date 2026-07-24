@@ -36,6 +36,7 @@ REPOS = [
     ("pallets/flask", "https://github.com/pallets/flask", "Python"),
     ("facebook/react", "https://github.com/facebook/react", "JavaScript"),
     ("expressjs/express", "https://github.com/expressjs/express", "JavaScript (CommonJS)"),
+    ("psf/requests", "https://github.com/psf/requests", "Python"),
     ("vercel/next.js", "https://github.com/vercel/next.js", "TypeScript (monorepo)"),
 ]
 

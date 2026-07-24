@@ -54,7 +54,9 @@ Docker, see the [`CONTRIBUTING.md`](CONTRIBUTING.md) setup steps.
 ## How was it validated?
 
 Against real public repositories (Django, FastAPI, Flask, React,
-Express), not synthetic test fixtures — see
+Express, and requests — five web frameworks plus one non-framework
+library, to check the scoring/scanning generalize), not synthetic test
+fixtures — see
 [`docs/benchmarks/2026-07-24-real-world-validation.md`](docs/benchmarks/2026-07-24-real-world-validation.md)
 for methodology and results, and
 [`docs/benchmarks/real-world-validation-reports/`](docs/benchmarks/real-world-validation-reports/)
