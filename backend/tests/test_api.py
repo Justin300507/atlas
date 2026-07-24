@@ -527,3 +527,204 @@ def test_job_records_error_on_clone_failure(monkeypatch, tmp_path):
     assert body["status"] == "error"
     assert body["error"] == "repository not found"
     assert body["markdown"] is None
+
+
+# --- v1.3 Engineering Advisor Suite endpoints -------------------------------
+
+
+def _fastapi_fixture_repo(tmp_path):
+    combined_repo = tmp_path / "combined_repo"
+    shutil.copytree(FIXTURES / "fastapi_repo", combined_repo)
+    subprocess.run(["git", "init"], cwd=combined_repo, check=True, capture_output=True)
+    subprocess.run(["git", "add", "."], cwd=combined_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=test@test.com", "-c", "user.name=test", "commit", "-m", "init"],
+        cwd=combined_repo,
+        check=True,
+        capture_output=True,
+    )
+    return combined_repo
+
+
+def test_technical_debt_endpoint_returns_expected_shape(tmp_path, monkeypatch):
+    repo = _fastapi_fixture_repo(tmp_path)
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield repo
+
+    monkeypatch.setattr("app.main.clone_with_history", fake_clone_with_history)
+
+    resp = client.post("/technical-debt", json={"repo_url": "https://github.com/example/example"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body.keys()) == {"average_debt_score", "top_debt_modules", "recommended_refactoring_order"}
+
+
+def test_technical_debt_endpoint_rejects_invalid_url():
+    resp = client.post("/technical-debt", json={"repo_url": "not-a-url"})
+    assert resp.status_code == 400
+
+
+def test_performance_analysis_endpoint_returns_expected_shape(tmp_path, monkeypatch):
+    repo = _fastapi_fixture_repo(tmp_path)
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield repo
+
+    monkeypatch.setattr("app.main.clone_with_history", fake_clone_with_history)
+
+    resp = client.post("/performance-analysis", json={"repo_url": "https://github.com/example/example"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body.keys()) == {"findings", "bottleneck_modules"}
+
+
+def test_performance_analysis_endpoint_rejects_invalid_url():
+    resp = client.post("/performance-analysis", json={"repo_url": "not-a-url"})
+    assert resp.status_code == 400
+
+
+def test_ai_architect_repository_overview_returns_deterministic_explanation(tmp_path, monkeypatch):
+    repo = _fastapi_fixture_repo(tmp_path)
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield repo
+
+    monkeypatch.setattr("app.main.clone_with_history", fake_clone_with_history)
+    monkeypatch.delenv("ATLAS_ANTHROPIC_API_KEY", raising=False)
+
+    resp = client.post(
+        "/ai-architect",
+        json={"repo_url": "https://github.com/example/example", "prompt_kind": "repository_overview"},
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["source"] == "deterministic"
+    assert "Overall score" in body["text"]
+    assert body["grounded_in"]
+
+
+def test_ai_architect_rejects_unknown_prompt_kind(tmp_path, monkeypatch):
+    repo = _fastapi_fixture_repo(tmp_path)
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield repo
+
+    monkeypatch.setattr("app.main.clone_with_history", fake_clone_with_history)
+
+    resp = client.post(
+        "/ai-architect",
+        json={"repo_url": "https://github.com/example/example", "prompt_kind": "not_a_real_kind"},
+    )
+
+    assert resp.status_code == 400
+
+
+def test_ai_architect_file_scoped_kind_requires_file(tmp_path, monkeypatch):
+    repo = _fastapi_fixture_repo(tmp_path)
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield repo
+
+    monkeypatch.setattr("app.main.clone_with_history", fake_clone_with_history)
+
+    resp = client.post(
+        "/ai-architect",
+        json={"repo_url": "https://github.com/example/example", "prompt_kind": "hotspot_explanation"},
+    )
+
+    assert resp.status_code == 400
+
+
+def test_ai_architect_file_scoped_kind_refuses_when_module_not_flagged(tmp_path, monkeypatch):
+    repo = _fastapi_fixture_repo(tmp_path)
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield repo
+
+    monkeypatch.setattr("app.main.clone_with_history", fake_clone_with_history)
+
+    resp = client.post(
+        "/ai-architect",
+        json={
+            "repo_url": "https://github.com/example/example",
+            "prompt_kind": "hotspot_explanation",
+            "file": "definitely_not_a_real_file.py",
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["source"] == "deterministic"
+    assert "Insufficient evidence" in body["text"]
+    assert body["grounded_in"] == []
+
+
+def test_ai_mentor_refuses_finding_atlas_did_not_flag(tmp_path, monkeypatch):
+    repo = _fastapi_fixture_repo(tmp_path)
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield repo
+
+    monkeypatch.setattr("app.main.clone_with_history", fake_clone_with_history)
+
+    resp = client.post(
+        "/ai-mentor",
+        json={
+            "repo_url": "https://github.com/example/example",
+            "finding_file": "definitely_not_a_real_file.py",
+            "finding_kind": "not_a_real_kind",
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["source"] == "deterministic"
+    assert "Insufficient evidence" in body["text"]
+    assert "did not flag" in body["text"]
+
+
+def test_ai_mentor_explains_a_finding_atlas_actually_flagged(tmp_path, monkeypatch):
+    repo = tmp_path / "repo_with_issue"
+    repo.mkdir()
+    (repo / "danger.py").write_text("import os\n\ndef run(cmd):\n    os.system(cmd)\n")
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=test@test.com", "-c", "user.name=test", "commit", "-m", "init"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield repo
+
+    monkeypatch.setattr("app.main.clone_with_history", fake_clone_with_history)
+    monkeypatch.delenv("ATLAS_ANTHROPIC_API_KEY", raising=False)
+
+    resp = client.post(
+        "/ai-mentor",
+        json={
+            "repo_url": "https://github.com/example/example",
+            "finding_file": "danger.py",
+            "finding_kind": "dangerous_execution",
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["source"] == "deterministic"
+    assert "dangerous_execution" in body["text"]
+    assert "danger.py" in body["text"]

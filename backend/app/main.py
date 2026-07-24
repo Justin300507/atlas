@@ -6,12 +6,26 @@ import subprocess
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import jobs
+from .ai_explain import (
+    AnthropicExplainer,
+    architecture_summary_evidence,
+    critical_module_explanation_evidence,
+    dependency_explanation_evidence,
+    finding_evidence,
+    hotspot_explanation_evidence,
+    insufficient_evidence,
+    layer_explanation_evidence,
+    repository_overview_evidence,
+    subsystem_summary_evidence,
+)
 from .cloner import (
     CloneError,
     InvalidRepoUrlError,
@@ -32,15 +46,23 @@ from .models import (
     CompareRequest,
     CompareResponse,
     DocumentationResponse,
+    ExplanationRequest,
+    ExplanationResponse,
     GitIntelligenceReport,
     GraphResponse,
+    MentorRequest,
+    PerformanceReport,
+    TechnicalDebtReport,
 )
+from .performance_analyzer import analyze_performance
 from .rate_limiter import RateLimiter
 from .report_pipeline import (
     _GIT_HISTORY_COMMITS,
     analyze_structure,
     run_full_analysis,
 )
+from .semantic_analysis import analyze_semantics
+from .technical_debt import analyze_technical_debt
 from .timing import StageTimer
 
 logging.basicConfig(
@@ -210,6 +232,121 @@ def git_intelligence(request: AnalyzeRequest) -> GitIntelligenceReport:
         raise HTTPException(status_code=504, detail="Repository clone timed out") from exc
     except CloneError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+# v1.3 Engineering Advisor Suite -- see
+# docs/superpowers/specs/2026-07-24-engineering-advisor-suite-design.md.
+# Debt/performance/architect/mentor clone and analyze a fresh repo per
+# request (like /git-intelligence) rather than requiring a prior /jobs
+# run, since they're meant to be usable standalone.
+
+_explainer = AnthropicExplainer()
+
+_ARCHITECT_EVIDENCE_NO_FILE = {
+    "architecture_summary": architecture_summary_evidence,
+    "subsystem_summary": subsystem_summary_evidence,
+    "dependency_explanation": dependency_explanation_evidence,
+    "layer_explanation": layer_explanation_evidence,
+}
+_ARCHITECT_EVIDENCE_WITH_FILE = {
+    "critical_module_explanation": critical_module_explanation_evidence,
+    "hotspot_explanation": hotspot_explanation_evidence,
+}
+
+
+@contextmanager
+def _cloned_repo_with_history(repo_url: str):
+    """Shared clone + error-translation for the four advisor endpoints below
+    -- the same three exceptions /analyze, /documentation, and
+    /git-intelligence each translate to an HTTPException individually."""
+    try:
+        with clone_with_history(repo_url, depth=_GIT_HISTORY_COMMITS + 1) as repo_path:
+            yield repo_path
+    except InvalidRepoUrlError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=504, detail="Repository clone timed out") from exc
+    except CloneError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _semantic_context(repo_path: Path):
+    """Structural + git + semantic analysis, shared by all four advisor
+    endpoints -- each needs a different subset of it but all start here."""
+    stack, files, graph, quality, security, coverage = analyze_structure(repo_path)
+    commits, history_truncated = parse_git_log(repo_path, max_commits=_GIT_HISTORY_COMMITS)
+    semantic = analyze_semantics(files, graph, quality, commits, repo_root=repo_path)
+    return files, graph, quality, security, semantic, commits
+
+
+@app.post("/technical-debt", response_model=TechnicalDebtReport, dependencies=[Depends(rate_limit)])
+def technical_debt(request: AnalyzeRequest) -> TechnicalDebtReport:
+    with _cloned_repo_with_history(request.repo_url) as repo_path:
+        files, graph, quality, _security, semantic, commits = _semantic_context(repo_path)
+        return analyze_technical_debt(files, graph, quality, semantic, commits, repo_root=repo_path)
+
+
+@app.post("/performance-analysis", response_model=PerformanceReport, dependencies=[Depends(rate_limit)])
+def performance_analysis(request: AnalyzeRequest) -> PerformanceReport:
+    with _cloned_repo_with_history(request.repo_url) as repo_path:
+        files, _graph, _quality, _security, semantic, _commits = _semantic_context(repo_path)
+        return analyze_performance(files, semantic, repo_root=repo_path)
+
+
+@app.post("/ai-architect", response_model=ExplanationResponse, dependencies=[Depends(rate_limit)])
+def ai_architect(request: ExplanationRequest) -> ExplanationResponse:
+    with _cloned_repo_with_history(request.repo_url) as repo_path:
+        _files, _graph, quality, _security, semantic, _commits = _semantic_context(repo_path)
+
+    if request.prompt_kind == "repository_overview":
+        evidence = repository_overview_evidence(
+            quality.overall_score, quality.maintainability_score, quality.architecture_score, semantic
+        )
+        return _explainer.explain(request.prompt_kind, evidence)
+
+    if request.prompt_kind in _ARCHITECT_EVIDENCE_NO_FILE:
+        evidence = _ARCHITECT_EVIDENCE_NO_FILE[request.prompt_kind](semantic)
+        return _explainer.explain(request.prompt_kind, evidence)
+
+    if request.prompt_kind in _ARCHITECT_EVIDENCE_WITH_FILE:
+        if not request.file:
+            raise HTTPException(
+                status_code=400, detail=f"prompt_kind '{request.prompt_kind}' requires a 'file'."
+            )
+        evidence = _ARCHITECT_EVIDENCE_WITH_FILE[request.prompt_kind](semantic, request.file)
+        if evidence is None:
+            return insufficient_evidence(
+                f"{request.file} was not flagged by Atlas for '{request.prompt_kind}' in this repository."
+            )
+        return _explainer.explain(request.prompt_kind, evidence)
+
+    raise HTTPException(status_code=400, detail=f"Unknown prompt_kind '{request.prompt_kind}'.")
+
+
+@app.post("/ai-mentor", response_model=ExplanationResponse, dependencies=[Depends(rate_limit)])
+def ai_mentor(request: MentorRequest) -> ExplanationResponse:
+    with _cloned_repo_with_history(request.repo_url) as repo_path:
+        _files, _graph, quality, security, semantic, _commits = _semantic_context(repo_path)
+
+    # AI Mentor only ever explains a finding Atlas itself already flagged --
+    # refuse (don't guess, don't ask the model) if the (file, kind) pair
+    # named in the request isn't actually present in this repository's
+    # analysis.
+    candidates = (
+        list(quality.issues)
+        + list(security.issues)
+        + list(semantic.coupling_issues)
+        + list(semantic.architectural_smells)
+    )
+    match = next(
+        (f for f in candidates if f.file == request.finding_file and f.kind == request.finding_kind), None
+    )
+    if match is None:
+        return insufficient_evidence(
+            f"Atlas did not flag '{request.finding_kind}' in {request.finding_file} for this repository."
+        )
+    evidence = finding_evidence(match)
+    return _explainer.explain("finding_explanation", evidence)
 
 
 def _submit_job(job_id: str, repo_url: str, request_id: str | None = None) -> None:
