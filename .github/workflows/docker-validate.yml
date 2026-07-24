@@ -25,7 +25,7 @@ jobs:
   compose-up:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build and start the stack
         run: docker compose up --build -d --wait --wait-timeout 120
