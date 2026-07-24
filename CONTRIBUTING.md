@@ -1,11 +1,11 @@
 # Contributing to Atlas
 
-Atlas is in public beta and the backend is feature-frozen for now — the
-highest-value contributions right now are bug fixes, documentation,
-additional real-repository validation, and test coverage rather than new
-analysis engines. If you want to build one of the "not yet built" pieces
-in [`README.md`](README.md) / [`ROADMAP.md`](ROADMAP.md), open an issue
-first so the scope is agreed before you write code.
+Atlas is in public beta. All ten originally-scoped subsystems have
+shipped (see [`ROADMAP.md`](ROADMAP.md)) — the highest-value
+contributions right now are bug fixes, documentation, additional
+real-repository validation, and test coverage. If you want to propose
+a new analysis engine beyond the original scope, open an issue first
+so it's agreed before you write code.
 
 ## Local setup
 

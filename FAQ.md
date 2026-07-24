@@ -175,6 +175,69 @@ described a limitation that a later fix removed, it's omitted here.
   the other "appeared", which is mechanically correct but not a
   meaningful comparison. Not specially detected or warned about.
 
+### Technical debt engine
+
+- Reuses data other engines already computed (quality issues, dependency
+  criticality, coupling issues, circular clusters) — it doesn't parse or
+  clone anything new, so it inherits every limitation those engines have.
+- Only `utility_dumping` and `layering_violation` architectural smells
+  count toward the score; `isolated_component` and `facade_pattern` are
+  excluded on purpose (a disconnected file is trivially safe to change,
+  and a facade is often a deliberate, healthy pattern) — found via
+  dogfooding on Atlas's own repo, where the initial version flagged
+  `vite.config.ts` (an isolated, safe-to-change file) at the same score
+  as a real god-module.
+- Confidence is `low` whenever the repository has no usable git history
+  or betweenness centrality wasn't computed for it (see the semantic
+  intelligence caps above) — the score is still shown, but it's a
+  rougher estimate in that case.
+- No duplicate-code or dead-code detection — that would need
+  cross-file similarity hashing, which doesn't exist anywhere in the
+  pipeline. The four signals it does use are the ones already available
+  from other engines.
+
+### Performance analyzer
+
+- **Static only, deliberately.** Atlas doesn't execute code or profile
+  anything, so nothing here is a measured performance cost — every
+  finding is a proxy signal from source structure.
+- Explicitly does not attempt: N+1 query detection, missing-index
+  detection, blocking-I/O detection, or memory-heavy-pattern detection.
+  All four would need framework-specific detectors (ORM call shapes
+  differ by framework) — the same reason the security scanner doesn't
+  attempt weak-auth/CORS checks.
+- "High branch count" is a proxy for deep nesting, not a direct
+  nesting-depth measurement — the message says so explicitly rather
+  than implying Atlas measured nesting.
+- Dependency-bottleneck detection reuses the existing
+  dependency-criticality top-15 intersected with coupling-issue files,
+  rather than introducing a new is-articulation-point signal.
+
+### AI Architect / AI Mentor
+
+- The AI layer never invents findings. Every explanation is built from
+  an explicit `_grounded_in` list of deterministic facts handed to it —
+  the model (when one is configured) is instructed to explain only
+  those facts, and the deterministic template-based explainer (used
+  when no AI is configured, or as the fallback on any AI failure) is
+  incapable of saying anything not in that list.
+- **AI Mentor refuses rather than guesses.** If the requested
+  `(file, kind)` pair wasn't actually flagged by Atlas's own analysis
+  of that repository, it returns a fixed "insufficient evidence"
+  response instead of asking the model to explain something that
+  wasn't found.
+- No environment this shipped in had `ATLAS_ANTHROPIC_API_KEY`
+  configured or the `anthropic` SDK live-tested against a real model —
+  the Anthropic call path is unit-tested against a mocked client only.
+  Every failure mode (missing key, missing SDK, network error, safety
+  refusal, empty response) falls back to the deterministic explainer,
+  so this doesn't affect reliability, but "the AI explanations sound
+  good" has not been verified against real model output.
+- `/ai-architect`'s two module-scoped prompt kinds
+  (`critical_module_explanation`, `hotspot_explanation`) require a
+  `file` parameter naming a module Atlas actually flagged for that
+  category — there's no "explain any file" mode.
+
 ### Git intelligence
 
 - Bug-fix commit detection is one regex against the commit subject line

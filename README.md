@@ -32,10 +32,24 @@ Given a public GitHub URL, Atlas clones it and produces:
   for measurable architecture/quality/security/git/semantic changes, with
   documented significance thresholds — never a "better/worse" verdict, only
   specific deltas.
+- **Technical Debt Engine** (`POST /technical-debt`) — modules ranked by a
+  weighted combination of complexity-under-churn, criticality-under-size,
+  coupling/architectural smells, and circular-dependency membership, with
+  per-module evidence and a confidence flag.
+- **Performance Analyzer** (`POST /performance-analysis`) — static-only
+  signals (very-large functions, high branch counts, dependency
+  bottlenecks); deliberately doesn't attempt N+1/ORM/runtime detection.
+- **AI Architect / AI Mentor** (`POST /ai-architect`, `POST /ai-mentor`) —
+  optional AI explanations of what the deterministic engines above already
+  found. The AI layer never invents findings: it's handed an explicit list
+  of deterministic facts and asked to explain only those, and it degrades
+  to a template-based explanation (not an error) with no API key configured.
 
-All deterministic, static analysis — no LLM calls in the pipeline itself.
-See two real generated reports in [`docs/examples/`](docs/examples/) (a
-Python CLI framework and a CommonJS Node.js server).
+Everything above the AI Architect/Mentor layer is deterministic, static
+analysis — no LLM calls. The AI layer is additive and optional: it explains
+facts the deterministic engines already computed, and never runs without
+them. See two real generated reports in [`docs/examples/`](docs/examples/)
+(a Python CLI framework and a CommonJS Node.js server).
 
 ## Screenshots
 
@@ -84,12 +98,10 @@ get back the rendered report. It survives a page refresh mid-analysis.
 - `docs/superpowers/specs/` — design docs, one per phase/feature.
 - `docs/superpowers/plans/` — implementation plans for earlier phases.
 
-## Not yet built
+## Limitations
 
-AI Architect (natural-language Q&A grounded in the dependency graph),
-Technical Debt Analyzer, Performance Analyzer, AI Mentor. See
-[`ROADMAP.md`](ROADMAP.md) for what each would involve and why the
-backend is frozen on these for now, and [`FAQ.md`](FAQ.md) for known
-limitations in what *is* built (e.g. the CORS/rate-limiting posture
-documented in the production-security-hardening and CORS-hardening
-specs).
+See [`FAQ.md`](FAQ.md) for the full known-limitations list — e.g. the
+CORS/rate-limiting posture documented in the production-security-hardening
+and CORS-hardening specs, the AI layer's mocked-not-live-validated
+Anthropic path, and what the Performance Analyzer deliberately doesn't
+attempt.

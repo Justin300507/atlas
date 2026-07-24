@@ -46,8 +46,14 @@ flowchart TD
 | `security_scanner.py` | Regex-based secrets/dangerous-exec/deserialization detection |
 | `git_log_parser.py` | `git log --numstat` → structured commits |
 | `git_intelligence.py` | Churn, ownership, co-change (capped to avoid the O(k²) blowup documented in the performance-benchmarking spec) |
+| `semantic_analysis.py` | Architecture metrics, dependency criticality, layer detection, engineering hotspots, coupling/smell detection |
+| `technical_debt.py` | Weighted debt score reusing quality/semantic/git data — no new parsing |
+| `performance_analyzer.py` | Static performance signals (large functions, branch count, dependency bottlenecks) |
+| `ai_explain.py` | Pluggable `Explainer` (deterministic-template + optional Anthropic) grounded to an explicit evidence list |
+| `snapshot.py` | Builds the compact `AnalysisSnapshot` persisted per job, used by comparison |
+| `comparison_engine.py` | Diffs two `AnalysisSnapshot`s into metric/set changes and regression/improvement findings |
 | `report_pipeline.py` | Wires the above into `/analyze`, `/documentation`, and the job runner |
-| `doc_generator.py` | Assembles the final Markdown report |
+| `doc_generator.py` | Assembles the final Markdown report (and the comparison report) |
 
 ## Frontend (`frontend/src/`)
 
@@ -58,15 +64,22 @@ refresh-recovery design doc.
 
 ## Why deterministic analysis, not an LLM wrapper
 
-Every scoring/detection engine above is static analysis: tree-sitter
+Every finding-producing engine above is static analysis: tree-sitter
 ASTs, graph algorithms (strongly-connected components for circular
 imports), regex patterns, git history parsing. This is a deliberate
 positioning choice (see project history): understanding a codebase is a
 more stable problem than generating one, and deterministic analysis is
 cheaper, faster, and doesn't hallucinate a dependency that isn't there.
-An AI layer remains a possible future addition (an "AI Architect" for
-natural-language Q&A grounded in the existing graph), but nothing in the
-current pipeline depends on one.
+
+`ai_explain.py` is the one place an LLM call can happen, and it's
+structurally incapable of bypassing the rule above: every call is
+handed an explicit list of deterministic facts (`_grounded_in`) and
+asked to explain only those — it never sees raw repo content and
+cannot introduce a finding the deterministic engines didn't already
+produce. It's also fully optional: with no `ATLAS_ANTHROPIC_API_KEY`
+configured (the default), the exact same evidence is rendered through
+a template instead, and every AI-path failure mode falls back to that
+same template rather than degrading the response.
 
 ## Data flow constraints worth knowing
 

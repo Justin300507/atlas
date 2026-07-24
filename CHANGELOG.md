@@ -7,6 +7,44 @@ Beta launch and groups by capability milestone, not by commit; see
 
 ## [Unreleased]
 
+### Added (v1.3)
+
+- **Technical Debt Engine** (`POST /technical-debt`, `technical_debt.py`)
+  — modules ranked by a weighted combination of complexity-under-churn,
+  dependency-criticality-under-size, coupling/architectural smells, and
+  circular-dependency membership, reusing already-computed data (no new
+  parsing or cloning). A dogfooding bug (every architectural smell kind
+  counted as debt, including `isolated_component` — a disconnected,
+  trivially-safe-to-change file) was caught before merge and fixed by
+  restricting to `utility_dumping`/`layering_violation`; regression
+  tests added. Validated on Atlas's own repo and Flask (`src/flask/app.py`
+  correctly ranked #1).
+- **Performance Analyzer** (`POST /performance-analysis`,
+  `performance_analyzer.py`) — static-only signals: very-large-function
+  size, high-branch-count (explicitly labeled a nesting proxy, not a
+  measurement), and dependency-bottleneck (criticality ∩ coupling).
+  Deliberately does not attempt N+1/ORM/blocking-I/O detection.
+- **AI Architect / AI Mentor** (`POST /ai-architect`, `POST /ai-mentor`,
+  `ai_explain.py`) — a pluggable `Explainer` abstraction: a
+  template-based `DeterministicExplainer` (always available) and an
+  optional `AnthropicExplainer` that is only ever handed an explicit
+  list of deterministic facts to explain — it cannot introduce a fact
+  Atlas didn't already compute. Falls back to the deterministic
+  explainer on any missing API key, missing SDK, network error, or
+  safety refusal. AI Mentor refuses (fixed response, not a guess) for
+  any finding Atlas didn't actually flag. The Anthropic call path is
+  unit-tested against a mocked client; not live-validated against a
+  real model response (no Anthropic credentials were available in the
+  environment this shipped from).
+- **Documentation Report / Repository Comparison integration** — debt
+  and performance sections render in the Markdown report whenever the
+  data is present (zero frontend changes needed), `AnalysisSnapshot`
+  gained `schema_version: 2` optional `debt`/`performance` fields, and
+  `compare_snapshots` compares them when both sides of a comparison
+  have the data (a comparison against a pre-v1.3 snapshot just omits
+  these rather than treating "missing" as a change from/to zero).
+  See `docs/superpowers/specs/2026-07-24-engineering-advisor-suite-design.md`.
+
 ### Added (v1.2)
 
 - **Repository Comparison** — `POST /compare` diffs two completed

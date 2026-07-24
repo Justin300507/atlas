@@ -1,10 +1,8 @@
 # Roadmap
 
-Atlas was originally scoped as 10 subsystems. This page tracks which are
-shipped and validated, and what's deliberately not built yet. The
-backend is currently **feature-frozen** — see [`CONTRIBUTING.md`](CONTRIBUTING.md)
-— so nothing below is in active development; this is a map for whoever
-picks the next phase, not a promise of dates.
+Atlas was originally scoped as 10 subsystems; all 10 have now shipped
+(v1.3 closed out the last four). This page tracks what's implemented
+and validated, and what was considered but not scoped.
 
 ## Implemented and validated
 
@@ -22,38 +20,9 @@ tests) and checked for believable output — see
 | Documentation Generator | `doc_generator.py` | Assembles the final Markdown report, no LLM involved |
 | Semantic Repository Intelligence | `semantic_analysis.py` | Architecture metrics, dependency criticality, layer detection, engineering hotspots, coupling/smell detection — validated on Django, Flask, and requests |
 | Repository Comparison | `comparison_engine.py`, `snapshot.py` | Deterministic diffing between two completed jobs' snapshots — added/removed/changed, documented regression/improvement thresholds. Commit/branch-level comparison not supported (cloner only fetches HEAD) |
-
-## Not yet built
-
-These four were in the original 10-subsystem vision and are **not**
-implemented. Their designs below are the original intent, not a
-committed spec — each would need its own design doc (per the
-[`CONTRIBUTING.md`](CONTRIBUTING.md) convention) before implementation
-starts.
-
-- **AI Architect** — natural-language Q&A grounded in the existing
-  dependency graph ("why is X slow", tracing a call path like
-  API→Service→DB→Response). This is the one subsystem that would
-  introduce an LLM call into the product. The intended design keeps it
-  bounded and accurate rather than a raw "ask an LLM about the repo" —
-  scope the question to a relevant subgraph and relevant files first,
-  then call a model on that narrow context, so the answer stays
-  traceable to real graph data. See
-  [`ARCHITECTURE.md`](ARCHITECTURE.md#why-deterministic-analysis-not-an-llm-wrapper)
-  for why this is treated as an addition on top of the deterministic
-  core, not a replacement for it.
-- **Technical Debt Analyzer** — refactor targets, duplicated logic,
-  unused dependencies, outdated libraries, with risk/effort estimates.
-  Would need duplicate-code detection (cross-file similarity hashing)
-  that doesn't exist anywhere in the current pipeline.
-- **Performance Analyzer** — N+1 query detection, missing indexes,
-  blocking I/O, memory-heavy patterns. Would likely need
-  framework-specific detectors (ORM call patterns differ by framework),
-  similar to why the security scanner doesn't attempt weak-auth/CORS
-  checks today.
-- **AI Mentor** — Q&A and feature-placement guidance grounded in the
-  actual codebase (e.g. "where should this new endpoint live"). Depends
-  on AI Architect's scoped-context approach existing first.
+| Technical Debt Engine | `technical_debt.py` | Weighted score (complexity×churn, centrality×size, coupling/smells, circular-cluster membership) reusing already-computed data — no new parsing or cloning. Validated on Atlas itself and Flask (`src/flask/app.py` correctly ranked #1) |
+| Performance Analyzer | `performance_analyzer.py` | Static-only: very-large-function size, high-branch-count (labeled a proxy for nesting, not measured), dependency-bottleneck (criticality ∩ coupling). Deliberately does not attempt N+1/ORM/runtime detection — see [`FAQ.md`](FAQ.md#performance-analyzer) |
+| AI Architect / AI Mentor | `ai_explain.py` | Pluggable `Explainer`: a template-based `DeterministicExplainer` (always available) plus an optional `AnthropicExplainer` that only ever narrates a `_grounded_in` evidence list passed to it — it cannot introduce facts Atlas didn't already compute. Falls back to the deterministic explainer on any missing API key, SDK, network error, or safety refusal. The Anthropic call path is unit-tested against a mocked client; no environment this shipped in had real Anthropic credentials, so it was never live-validated against an actual model response — see [`FAQ.md`](FAQ.md#ai-explainer) |
 
 ## Also considered, not scoped
 
@@ -63,15 +32,17 @@ starts.
   reuses the graph Atlas already builds (no new engine required), but
   not designed or committed to.
 
-## Why the backend is frozen right now
+## History of the "feature freeze"
 
 After the fifth core subsystem (Documentation Generator) shipped, the
 explicit decision was to stop adding engines and instead prove the
 existing five work: real-repo validation, a frontend, deployment,
-documentation, and benchmarking — the work this public beta prep
-reflects. Security Scanner was added after that decision (validated
-independently), but the general principle held: ship fewer engines,
-validate them harder, before adding more. Any of the four "not yet
-built" subsystems should only be started after there's real user
-feedback suggesting it's the right next investment, not because it was
-on the original list.
+documentation, and benchmarking. Security Scanner, Semantic Repository
+Intelligence, and Repository Comparison were each added and validated
+independently after that. The remaining four (Technical Debt Engine,
+Performance Analyzer, AI Architect, AI Mentor) shipped together in
+v1.3 — all ten originally-scoped subsystems are now implemented. The
+general engineering principle that justified the freeze — validate
+each engine against real repositories before building the next one —
+was kept for every one of these ten, not abandoned when the freeze
+itself ended.
