@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import time
 import uuid
@@ -45,11 +46,25 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Atlas Repository Intelligence")
 
+_resolved_cors_origins = resolve_cors_origins()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=resolve_cors_origins(),
+    allow_origins=_resolved_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# One-line confirmation of what actually took effect -- resolve_cors_origins
+# either raises (refuses to start) or silently returns a list, so without
+# this, an operator setting ATLAS_ALLOWED_ORIGINS in production has no way
+# to confirm the value was read correctly short of triggering an actual
+# cross-origin request and inspecting the response.
+logger.info(
+    "startup config: env=%s allowed_origins=%s log_level=%s",
+    os.environ.get("ATLAS_ENV", "development"),
+    _resolved_cors_origins,
+    logging.getLevelName(resolve_log_level()),
 )
 
 

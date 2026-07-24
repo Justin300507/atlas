@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -29,3 +30,24 @@ def test_importing_main_configures_root_logging_handlers():
 
     assert "handlers= 0" not in result.stdout
     assert "info_enabled= True" in result.stdout
+
+
+def test_startup_logs_the_resolved_config():
+    # Found while reviewing startup logs for this session's observability
+    # pass: resolve_cors_origins() either raises (refuses to start) or
+    # silently returns a list -- an operator setting ATLAS_ALLOWED_ORIGINS
+    # had no log confirmation the value was actually read, short of
+    # triggering a real cross-origin request. Run in a subprocess for the
+    # same reason as the test above: import-time logging.basicConfig only
+    # does something observable outside of pytest's own log capture.
+    result = subprocess.run(
+        [sys.executable, "-c", "import app.main\n"],
+        cwd=BACKEND_DIR,
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**os.environ, "ATLAS_ALLOWED_ORIGINS": "https://example.com"},
+    )
+
+    assert "startup config:" in result.stderr
+    assert "https://example.com" in result.stderr
