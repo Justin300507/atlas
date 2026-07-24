@@ -7,7 +7,7 @@
 - Deployment: Not detected
 - Architecture: Not detected
 - Files analyzed: 141
-- Overall quality score: 84/100 (maintainability 69, architecture 100)
+- Overall quality score: 98/100 (maintainability 95, architecture 100)
 - Commits analyzed: 500 (history truncated)
 
 ## Architecture Overview
@@ -357,12 +357,12 @@ _(40 of 141 modules shown, capped for readability)_
 
 ## Security Findings
 
-- **important** `test/res.redirect.js:115` dangerous_execution: eval() on untrusted input can execute arbitrary code
-- **important** `test/res.redirect.js:116` dangerous_execution: eval() on untrusted input can execute arbitrary code
+- **minor** `test/res.redirect.js:115` dangerous_execution: eval() on untrusted input can execute arbitrary code (in a test/fixture path â€” lower confidence)
+- **minor** `test/res.redirect.js:116` dangerous_execution: eval() on untrusted input can execute arbitrary code (in a test/fixture path â€” lower confidence)
 
 ## Recent High-Churn Components
 
-Analyzed 500 commits (history truncated — repo has more commits than analyzed).
+Analyzed 500 commits (history truncated â€” repo has more commits than analyzed).
 
 | File | Commits | Bug fixes |
 |---|---|---|
@@ -392,4 +392,4 @@ Analyzed 500 commits (history truncated — repo has more commits than analyzed)
 - Imports whose target isn't a string literal (e.g. `require(somePathVariable)`) can't be resolved statically and are skipped.
 - Security scanning is pattern-based (not full static analysis) and can miss real issues or flag safe code that matches a risky pattern.
 - Quality and architecture scores are heuristic engineering signals, not guarantees of correctness or safety.
-
+- Very large repositories are capped (5,000 source files, 2MB per file, 50,000 total filesystem entries) â€” see "Files analyzed" above for whether this repository hit a cap.

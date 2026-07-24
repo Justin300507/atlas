@@ -7,7 +7,7 @@
 - Deployment: Not detected
 - Architecture: Not detected
 - Files analyzed: 637
-- Overall quality score: 20/100 (maintainability 0, architecture 39)
+- Overall quality score: 68/100 (maintainability 97, architecture 39)
 - Commits analyzed: 500 (history truncated)
 
 ## Architecture Overview
@@ -200,14 +200,14 @@ No issues detected.
 
 ## Recent High-Churn Components
 
-Analyzed 500 commits (history truncated — repo has more commits than analyzed).
+Analyzed 500 commits (history truncated â€” repo has more commits than analyzed).
 
 | File | Commits | Bug fixes |
 |---|---|---|
-| docs/release-notes.md | 266 | 1 |
+| docs/release-notes.md | 265 | 1 |
 | uv.lock | 116 | 1 |
 | pyproject.toml | 31 | 1 |
-| typer/__init__.py | 24 | 0 |
+| typer/__init__.py | 23 | 0 |
 | .github/workflows/test.yml | 19 | 2 |
 | .github/workflows/build-docs.yml | 14 | 1 |
 | .pre-commit-config.yaml | 12 | 1 |
@@ -230,4 +230,4 @@ Analyzed 500 commits (history truncated — repo has more commits than analyzed)
 - Imports whose target isn't a string literal (e.g. `require(somePathVariable)`) can't be resolved statically and are skipped.
 - Security scanning is pattern-based (not full static analysis) and can miss real issues or flag safe code that matches a risky pattern.
 - Quality and architecture scores are heuristic engineering signals, not guarantees of correctness or safety.
-
+- Very large repositories are capped (5,000 source files, 2MB per file, 50,000 total filesystem entries) â€” see "Files analyzed" above for whether this repository hit a cap.
