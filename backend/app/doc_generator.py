@@ -49,7 +49,7 @@ def generate_documentation(
     performance: PerformanceReport | None = None,
 ) -> str:
     sections = [
-        _executive_summary(stack, files, quality, security, git_report, coverage),
+        _executive_summary(stack, files, quality, security, git_report, coverage, debt),
         _architecture_overview(graph),
     ]
     if semantic is not None:
@@ -89,6 +89,26 @@ def _relative(repo_root: Path, path: str) -> str:
         return PurePath(path).as_posix()
 
 
+_HEALTH_LABEL_THRESHOLDS = [(85, "Strong"), (70, "Good"), (50, "Moderate")]
+_HEALTH_LABEL_DEFAULT = "Needs attention"
+
+# A documented starting point (like the other score thresholds in this
+# file), not empirically tuned -- no historical corpus of "does a human
+# agree this repo's health is Strong/Good/Moderate" exists yet.
+def _health_label(score: int) -> str:
+    for floor, label in _HEALTH_LABEL_THRESHOLDS:
+        if score >= floor:
+            return label
+    return _HEALTH_LABEL_DEFAULT
+
+
+# "Concentrated" here means the same threshold used to decide whether the
+# Technical Debt section's own concentration note is worth showing at all
+# -- half or more of the combined debt score sitting in just the top 3
+# modules is a genuinely lopsided distribution, not an arbitrary cutoff.
+_DEBT_CONCENTRATION_NARRATIVE_THRESHOLD = 0.5
+
+
 def _executive_summary(
     stack: StackReport,
     files: list[FileSymbols],
@@ -96,6 +116,7 @@ def _executive_summary(
     security: SecurityReport,
     git_report: GitIntelligenceReport,
     coverage: FileCoverage | None = None,
+    debt: TechnicalDebtReport | None = None,
 ) -> str:
     lines = ["## Executive Summary", ""]
     for label, value in [
@@ -111,6 +132,30 @@ def _executive_summary(
     lines.append(
         f"- Overall quality score: {quality.overall_score}/100 "
         f"(maintainability {quality.maintainability_score}, architecture {quality.architecture_score})"
+    )
+    # Requested: "a short narrative helps readers understand the report
+    # before diving into details" -- and a note on what actually drives the
+    # numbers, since a plausible-sounding guess at the formula (dependency
+    # concentration, coupling, modularity) would be wrong: architecture
+    # score is purely circular-dependency-cluster-based, maintainability is
+    # purely function-length/complexity/naming-based. Neither factors in
+    # coupling or dependency concentration -- those live in Dependency
+    # Criticality and Coupling & Smells instead (2026-07-24).
+    lines.append(
+        f"- Repository health: {_health_label(quality.overall_score)} overall quality."
+    )
+    if debt is not None and debt.top_debt_modules:
+        ratio = _debt_concentration_ratio(debt.top_debt_modules)
+        if ratio is not None and ratio >= _DEBT_CONCENTRATION_NARRATIVE_THRESHOLD:
+            lines.append(
+                "  Technical debt is concentrated in a small number of modules "
+                "(see Technical Debt below), not spread evenly."
+            )
+    lines.append(
+        "  _Maintainability reflects how often functions exceed length/complexity/"
+        "naming thresholds, as a proportion rather than a raw count; architecture "
+        "reflects circular-dependency clusters (how many, how large, and how many "
+        "modules participate). Overall is their average._"
     )
     # A reader who sees "100/100" and only later scrolls to a critical
     # security finding reasonably reads that as contradictory -- the score
@@ -385,6 +430,16 @@ def _technical_debt(debt: TechnicalDebtReport) -> str:
     return "\n".join(lines)
 
 
+def _debt_concentration_ratio(modules: list[DebtModule]) -> float | None:
+    if len(modules) <= _DEBT_CONCENTRATION_TOP_N:
+        return None
+    total = sum(m.debt_score for m in modules)
+    if total <= 0:
+        return None
+    top_total = sum(m.debt_score for m in modules[:_DEBT_CONCENTRATION_TOP_N])
+    return top_total / total
+
+
 def _debt_concentration_note(modules: list[DebtModule]) -> str | None:
     # A reader shouldn't have to eyeball a 15-row table to tell whether
     # debt is spread evenly or concentrated in a handful of modules --
@@ -392,13 +447,9 @@ def _debt_concentration_note(modules: list[DebtModule]) -> str | None:
     # Deliberately doesn't name *why* those modules are central (Atlas
     # doesn't know their purpose, e.g. "orchestration") -- only the
     # measured score concentration, which it does know.
-    if len(modules) <= _DEBT_CONCENTRATION_TOP_N:
+    ratio = _debt_concentration_ratio(modules)
+    if ratio is None:
         return None
-    total = sum(m.debt_score for m in modules)
-    if total <= 0:
-        return None
-    top_total = sum(m.debt_score for m in modules[:_DEBT_CONCENTRATION_TOP_N])
-    ratio = top_total / total
     return (
         f"The top {_DEBT_CONCENTRATION_TOP_N} of the {len(modules)} modules shown account for "
         f"{ratio:.0%} of their combined debt score."
@@ -509,18 +560,27 @@ def _api_reference(repo_root: Path, files: list[FileSymbols]) -> str:
 
 
 def _system_overview_diagram(repo_root: Path, graph: nx.DiGraph) -> str:
-    """A directory-level rollup of the import graph -- one node per
-    top-level directory, edges labeled with the number of import edges
-    crossing between them. Shown only when the detailed module diagram is
-    large enough to be capped, since that's exactly when a single
-    module-level diagram stops being readable. Reported: "for repositories
-    this large, render two graphs" (2026-07-24)."""
+    """A directory-level rollup of the import graph. Two parts: a module-
+    count line covering every top-level directory that has at least one
+    parsed source module (not just ones with cross-directory import
+    edges -- a real repo's tests/ and docs/ directories had real file
+    counts but no import edges to backend/, so they were invisible in an
+    edges-only diagram), and a Mermaid diagram of the cross-directory
+    import edges themselves. Shown only when the detailed module diagram
+    is large enough to be capped, since that's exactly when a single
+    module-level diagram stops being readable. Reported: "for
+    repositories this large, render two graphs" / "expand it slightly to
+    show key top-level directories" (2026-07-24)."""
     module_nodes = [n for n, d in graph.nodes(data=True) if d.get("type") == "module"]
     dir_of: dict[str, str] = {}
     for n in module_nodes:
         rel = _relative(repo_root, n)
         parts = rel.split("/")
         dir_of[n] = parts[0] if len(parts) > 1 else "."
+
+    dir_counts: dict[str, int] = {}
+    for d in dir_of.values():
+        dir_counts[d] = dir_counts.get(d, 0) + 1
 
     edge_counts: dict[tuple[str, str], int] = {}
     for u, v, d in graph.edges(data=True):
@@ -531,15 +591,30 @@ def _system_overview_diagram(repo_root: Path, graph: nx.DiGraph) -> str:
             continue  # only cross-directory structure belongs in an overview
         edge_counts[(du, dv)] = edge_counts.get((du, dv), 0) + 1
 
-    if not edge_counts:
+    if len(dir_counts) <= 1 and not edge_counts:
         return ""
 
-    dir_names = sorted({d for pair in edge_counts for d in pair})
-    node_ids = {d: f"d{i}" for i, d in enumerate(dir_names)}
-    lines = ["```mermaid", "graph TD"]
-    for (du, dv), count in sorted(edge_counts.items()):
-        lines.append(f'    {node_ids[du]}["{du}"] -->|"{count}"| {node_ids[dv]}["{dv}"]')
-    lines.append("```")
+    lines: list[str] = []
+    if len(dir_counts) > 1:
+        ranked = sorted(dir_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        lines.append(
+            "Top-level directories with analyzed source modules: "
+            + ", ".join(f"`{d}` ({c})" for d, c in ranked)
+            + ". Non-code directories (docs, config, etc.) aren't part of "
+            "the import graph and don't appear here."
+        )
+        lines.append("")
+
+    if edge_counts:
+        dir_names = sorted({d for pair in edge_counts for d in pair})
+        node_ids = {d: f"d{i}" for i, d in enumerate(dir_names)}
+        lines.append("```mermaid")
+        lines.append("graph TD")
+        for (du, dv), count in sorted(edge_counts.items()):
+            lines.append(f'    {node_ids[du]}["{du}"] -->|"{count}"| {node_ids[dv]}["{dv}"]')
+        lines.append("```")
+    else:
+        lines.append("_No cross-directory import edges detected between top-level directories._")
     return "\n".join(lines)
 
 

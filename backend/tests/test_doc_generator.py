@@ -389,6 +389,36 @@ def test_dependency_diagram_shows_system_overview_when_capped_and_cross_director
     assert section.count("```mermaid") == 2
     assert '["backend"]' in section
     assert '["frontend"]' in section
+    assert "Top-level directories with analyzed source modules" in section
+    assert "`backend` (23)" in section
+    assert "`frontend` (22)" in section
+
+
+def test_dependency_diagram_system_overview_lists_directories_with_no_cross_edges_too():
+    # Regression test: a directory with real analyzed files but zero
+    # cross-directory import edges (e.g. a self-contained tests/ package)
+    # was invisible in an edges-only overview. Reported against a real
+    # 440-file repo: "expand it slightly to show key top-level
+    # directories" (2026-07-24).
+    graph = nx.DiGraph()
+    for i in range(41):
+        graph.add_node(str(REPO_ROOT / "backend" / f"mod_{i}.py"), type="module")
+    for i in range(40):
+        graph.add_edge(
+            str(REPO_ROOT / "backend" / f"mod_{i}.py"),
+            str(REPO_ROOT / "backend" / f"mod_{i + 1}.py"),
+            type="import",
+        )
+    # A self-contained directory: real files, but no edges crossing out.
+    for i in range(5):
+        graph.add_node(str(REPO_ROOT / "tests" / f"test_{i}.py"), type="module")
+
+    doc = generate_documentation(REPO_ROOT, StackReport(), [], graph, _empty_quality(), _empty_security(), _empty_git())
+
+    section = doc.split("## Dependency Diagram")[1]
+    assert "`tests` (5)" in section
+    assert "`backend` (41)" in section
+    assert "No cross-directory import edges detected" in section
 
 
 def test_dependency_diagram_omits_system_overview_when_not_capped():
