@@ -155,6 +155,11 @@ described a limitation that a later fix removed, it's omitted here.
   [production checklist in `DEPLOYMENT.md`](DEPLOYMENT.md#production-checklist).
   This is the single most important thing to fix before a real-traffic
   public launch.
+- Job completion is logged from a background thread, decoupled from the
+  `Request` that queued it. `POST /jobs` threads its request ID through
+  explicitly so the per-job completion log line still correlates back to
+  the request that started it — the log line for an in-flight job's
+  stage progress does not carry the same ID.
 - No hard timeout on an in-flight analysis job — Python has no reliable
   cross-thread preemption, so the file/history caps above are the only
   mitigation against a pathological repo.

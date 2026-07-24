@@ -248,7 +248,7 @@ def test_documentation_rejects_invalid_url():
 
 def test_create_job_returns_202_with_job_id(monkeypatch, tmp_path):
     monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
-    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url: None)
+    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url, request_id=None: None)
 
     resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
 
@@ -269,7 +269,7 @@ def test_create_job_rejects_invalid_url(monkeypatch, tmp_path):
 def test_create_job_rejects_when_too_many_jobs_are_active(monkeypatch, tmp_path):
     monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
     monkeypatch.setattr("app.main._MAX_ACTIVE_JOBS", 2)
-    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url: None)
+    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url, request_id=None: None)
 
     for _ in range(2):
         resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
@@ -289,7 +289,7 @@ def test_get_job_returns_404_for_unknown_id(monkeypatch, tmp_path):
 
 def test_get_job_includes_created_at_for_refresh_recovery(monkeypatch, tmp_path):
     monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
-    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url: None)
+    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url, request_id=None: None)
 
     create_resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
     job_id = create_resp.json()["job_id"]
@@ -345,7 +345,7 @@ def test_rate_limit_returns_429_with_retry_after_once_exceeded(monkeypatch, tmp_
     from app.rate_limiter import RateLimiter
 
     monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
-    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url: None)
+    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url, request_id=None: None)
     monkeypatch.setattr("app.main._RATE_LIMITER", RateLimiter(max_requests=2, window_seconds=60))
 
     for _ in range(2):
@@ -361,7 +361,7 @@ def test_rate_limit_key_ignores_x_forwarded_for_header(monkeypatch, tmp_path):
     from app.rate_limiter import RateLimiter
 
     monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
-    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url: None)
+    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url, request_id=None: None)
     monkeypatch.setattr("app.main._RATE_LIMITER", RateLimiter(max_requests=1, window_seconds=60))
 
     resp_a = client.post(
@@ -404,13 +404,23 @@ def test_job_logs_stage_timings_on_completion(monkeypatch, tmp_path, caplog):
     monkeypatch.setattr("app.main._submit_job", app_main._run_job)
 
     with caplog.at_level("INFO", logger="app.main"):
-        create_resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
+        create_resp = client.post(
+            "/jobs",
+            json={"repo_url": "https://github.com/example/example"},
+            headers={"X-Request-ID": "caller-supplied-id-456"},
+        )
     job_id = create_resp.json()["job_id"]
 
     timing_records = [r for r in caplog.records if "stage timings" in r.getMessage()]
     assert len(timing_records) == 1
     assert job_id in timing_records[0].getMessage()
     assert "total" in timing_records[0].getMessage()
+    # The job runs on a background thread, decoupled from the Request that
+    # queued it -- this is the regression check that request_id still
+    # threads through so a job's completion log correlates back to the
+    # POST /jobs request that started it (see FAQ.md's observability
+    # limitations, which previously listed this as a known gap).
+    assert "request_id=caller-supplied-id-456" in timing_records[0].getMessage()
 
 
 def test_job_records_error_on_clone_failure(monkeypatch, tmp_path):

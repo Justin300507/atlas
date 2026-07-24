@@ -192,11 +192,15 @@ def git_intelligence(request: AnalyzeRequest) -> GitIntelligenceReport:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-def _submit_job(job_id: str, repo_url: str) -> None:
-    _JOB_EXECUTOR.submit(_run_job, job_id, repo_url)
+def _submit_job(job_id: str, repo_url: str, request_id: str | None = None) -> None:
+    _JOB_EXECUTOR.submit(_run_job, job_id, repo_url, request_id)
 
 
-def _run_job(job_id: str, repo_url: str) -> None:
+def _run_job(job_id: str, repo_url: str, request_id: str | None = None) -> None:
+    # _run_job executes on a ThreadPoolExecutor thread, decoupled from the
+    # Request that queued it -- request_id is passed explicitly (not read
+    # from request.state) so the job's completion log line still
+    # correlates back to the POST /jobs request that started it.
     jobs.update_job(job_id, status="running")
     timer = StageTimer(lambda stage: jobs.update_job(job_id, stage=stage))
     try:
@@ -212,11 +216,16 @@ def _run_job(job_id: str, repo_url: str) -> None:
         jobs.update_job(job_id, status="error", error=f"Unexpected error: {exc}")
     finally:
         durations = timer.finish()
-        logger.info("job %s stage timings (seconds): %s", job_id, durations)
+        logger.info(
+            "job %s stage timings (seconds): %s [request_id=%s]",
+            job_id,
+            durations,
+            request_id,
+        )
 
 
 @app.post("/jobs", status_code=202, dependencies=[Depends(rate_limit)])
-def create_job_endpoint(request: AnalyzeRequest) -> dict:
+def create_job_endpoint(request: AnalyzeRequest, http_request: Request) -> dict:
     try:
         validate_github_url(request.repo_url)
     except InvalidRepoUrlError as exc:
@@ -228,7 +237,7 @@ def create_job_endpoint(request: AnalyzeRequest) -> dict:
             status_code=429,
             detail="Too many analyses are already in progress. Try again shortly.",
         )
-    _submit_job(job_id, request.repo_url)
+    _submit_job(job_id, request.repo_url, getattr(http_request.state, "request_id", None))
     return {"job_id": job_id}
 
 
