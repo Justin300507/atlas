@@ -21,6 +21,7 @@ tests) and checked for believable output — see
 | Git Intelligence | `git_intelligence.py`, `git_log_parser.py` | Churn, ownership, co-change, bounded to last 500 commits |
 | Documentation Generator | `doc_generator.py` | Assembles the final Markdown report, no LLM involved |
 | Semantic Repository Intelligence | `semantic_analysis.py` | Architecture metrics, dependency criticality, layer detection, engineering hotspots, coupling/smell detection — validated on Django, Flask, and requests |
+| Repository Comparison | `comparison_engine.py`, `snapshot.py` | Deterministic diffing between two completed jobs' snapshots — added/removed/changed, documented regression/improvement thresholds. Commit/branch-level comparison not supported (cloner only fetches HEAD) |
 
 ## Not yet built
 

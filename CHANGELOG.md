@@ -7,6 +7,21 @@ Beta launch and groups by capability milestone, not by commit; see
 
 ## [Unreleased]
 
+### Added (v1.2)
+
+- **Repository Comparison** — `POST /compare` diffs two completed
+  jobs' snapshots (`AnalysisSnapshot`, persisted via a real schema
+  migration on the existing jobs table) for architecture/quality/
+  security/git/semantic changes. Documented significance thresholds
+  (±5 points score noise floor, new circular clusters and critical/
+  important security findings always flagged, criticality/hotspot set
+  changes reported as facts, not classified good/bad). See
+  `docs/superpowers/specs/2026-07-24-repository-comparison-design.md`.
+  Validated against real Flask/requests snapshots end-to-end; a
+  regression/improvement label-inversion bug was caught by its own
+  test suite before merge, not by inspection.
+
+
 ### Added
 
 - **Semantic Repository Intelligence Engine** — architecture metrics

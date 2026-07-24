@@ -155,6 +155,26 @@ described a limitation that a later fix removed, it's omitted here.
 - Facade/utility-dumping detection is a pattern match (filename +
   fan-in/fan-out shape), not a claim about the author's intent.
 
+### Repository comparison
+
+- Only compares two completed Atlas jobs by ID — there's no support for
+  comparing arbitrary commits or branches, since `cloner.py` only
+  clones the HEAD of a bare repo URL. Extending that is separate scope
+  from comparison itself.
+- Thresholds (±5 points as the score noise floor, top-15 list size) are
+  a documented starting point, not empirically tuned — no historical
+  comparison dataset exists yet for this feature.
+- A module becoming more or less "central" (entering/leaving the
+  dependency-criticality top 15) is reported as a fact, not classified
+  as a regression or improvement — becoming more central isn't
+  inherently good or bad without knowing why.
+- Comparing two unrelated repositories (not two runs of the same one)
+  is technically possible and produces a mostly "everything is
+  different" report — verified directly (Flask vs. requests): every
+  hotspot/critical-module from one "disappeared" and every one from
+  the other "appeared", which is mechanically correct but not a
+  meaningful comparison. Not specially detected or warned about.
+
 ### Git intelligence
 
 - Bug-fix commit detection is one regex against the commit subject line

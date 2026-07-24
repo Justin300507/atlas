@@ -28,6 +28,10 @@ Given a public GitHub URL, Atlas clones it and produces:
   centrality × complexity), and coupling/architectural-smell detection.
 - **Documentation Generator** — a single Markdown report combining all of the
   above, with Mermaid dependency, critical-module, and subsystem diagrams.
+- **Repository Comparison** — compare two completed analyses (`POST /compare`)
+  for measurable architecture/quality/security/git/semantic changes, with
+  documented significance thresholds — never a "better/worse" verdict, only
+  specific deltas.
 
 All deterministic, static analysis — no LLM calls in the pipeline itself.
 See two real generated reports in [`docs/examples/`](docs/examples/) (a
