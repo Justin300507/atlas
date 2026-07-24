@@ -19,13 +19,18 @@ from .cloner import (
     shallow_clone,
     validate_github_url,
 )
+from .comparison_engine import compare_snapshots
 from .config import resolve_cors_origins, resolve_log_level
+from .doc_generator import generate_comparison_report
 from .git_intelligence import analyze_git_history
 from .git_log_parser import parse_git_log
 from .graph_builder import to_node_link
 from .models import (
+    AnalysisSnapshot,
     AnalyzeRequest,
     AnalyzeResponse,
+    CompareRequest,
+    CompareResponse,
     DocumentationResponse,
     GitIntelligenceReport,
     GraphResponse,
@@ -220,7 +225,8 @@ def _run_job(job_id: str, repo_url: str, request_id: str | None = None) -> None:
     timer = StageTimer(lambda stage: jobs.update_job(job_id, stage=stage))
     try:
         response = run_full_analysis(repo_url, on_stage=timer)
-        jobs.update_job(job_id, status="done", markdown=response.markdown)
+        snapshot_json = response.snapshot.model_dump_json() if response.snapshot else None
+        jobs.update_job(job_id, status="done", markdown=response.markdown, snapshot=snapshot_json)
     except InvalidRepoUrlError as exc:
         jobs.update_job(job_id, status="error", error=str(exc))
     except subprocess.TimeoutExpired:
@@ -269,3 +275,29 @@ def get_job_endpoint(job_id: str) -> dict:
         "error": record.error,
         "created_at": record.created_at,
     }
+
+
+def _resolve_snapshot_for_comparison(job_id: str) -> AnalysisSnapshot:
+    record = jobs.get_job(job_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"No job found with id {job_id}")
+    if record.status != "done":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Job {job_id} is not done yet (status: {record.status}) -- no snapshot available.",
+        )
+    if record.snapshot is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Job {job_id} has no snapshot -- it predates the comparison feature.",
+        )
+    return AnalysisSnapshot.model_validate_json(record.snapshot)
+
+
+@app.post("/compare", response_model=CompareResponse, dependencies=[Depends(rate_limit)])
+def compare(request: CompareRequest) -> CompareResponse:
+    snapshot_a = _resolve_snapshot_for_comparison(request.job_id_a)
+    snapshot_b = _resolve_snapshot_for_comparison(request.job_id_b)
+    comparison = compare_snapshots(snapshot_a, snapshot_b)
+    markdown = generate_comparison_report(comparison)
+    return CompareResponse(markdown=markdown, comparison=comparison)

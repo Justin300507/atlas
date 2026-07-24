@@ -22,6 +22,7 @@ from .models import (
 from .quality_engine import analyze_quality
 from .security_scanner import scan_files
 from .semantic_analysis import analyze_semantics
+from .snapshot import build_snapshot
 from .stack_detector import detect
 
 # Bounds on parsing arbitrary cloned repos: this pipeline clones and parses
@@ -174,4 +175,5 @@ def run_full_analysis(
     markdown = generate_documentation(
         repo_root, stack, files, graph, quality, security, git_report, coverage, semantic
     )
-    return DocumentationResponse(markdown=markdown)
+    snapshot = build_snapshot(repo_url, quality, security, git_report, semantic)
+    return DocumentationResponse(markdown=markdown, snapshot=snapshot)

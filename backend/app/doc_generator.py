@@ -6,6 +6,8 @@ import networkx as nx
 
 from .code_parser import FileSymbols
 from .models import (
+    ComparisonFinding,
+    ComparisonReport,
     FileCoverage,
     GitIntelligenceReport,
     QualityReport,
@@ -18,6 +20,7 @@ from .semantic_analysis import _LAYER_ORDER
 _DIAGRAM_NODE_CAP = 40
 _HIGH_CHURN_LIMIT = 10
 _RISK_AREAS_LIMIT = 20
+_COMPARISON_DIAGRAM_CAP = 15
 _SECURITY_FINDINGS_LIMIT = 20
 _SEVERITY_ORDER = {"critical": 0, "important": 1, "minor": 2}
 _CRITICAL_MODULE_DIAGRAM_CAP = 15
@@ -450,5 +453,140 @@ def _analysis_coverage() -> str:
             "- Very large repositories are capped (5,000 source files, 2MB per "
             "file, 50,000 total filesystem entries) — see \"Files analyzed\" "
             "above for whether this repository hit a cap.",
+        ]
+    )
+
+
+def generate_comparison_report(comparison: ComparisonReport) -> str:
+    sections = [
+        _comparison_executive_summary(comparison),
+        _comparison_metric_changes(comparison),
+        _comparison_findings("Regressions", comparison.regressions),
+        _comparison_findings("Improvements", comparison.improvements),
+        _comparison_set_changes(comparison),
+        _comparison_critical_module_diagram(comparison),
+        _comparison_limitations(),
+    ]
+    return "\n\n".join(s for s in sections if s) + "\n"
+
+
+def _comparison_executive_summary(comparison: ComparisonReport) -> str:
+    lines = [
+        "## Executive Summary",
+        "",
+        f"- Repo A: {comparison.repo_url_a} (analyzed {comparison.generated_at_a})",
+        f"- Repo B: {comparison.repo_url_b} (analyzed {comparison.generated_at_b})",
+        f"- Regressions found: {len(comparison.regressions)}",
+        f"- Improvements found: {len(comparison.improvements)}",
+    ]
+    if not comparison.regressions and not comparison.improvements:
+        lines.append(
+            "- No metric moved beyond this analysis' significance thresholds — "
+            "see Metric Changes below for the raw deltas regardless."
+        )
+    lines.append(
+        "- **Never read this as \"better\" or \"worse\" overall** — only the "
+        "specific measurable changes below are asserted; nothing here is a "
+        "composite verdict."
+    )
+    return "\n".join(lines)
+
+
+def _comparison_metric_changes(comparison: ComparisonReport) -> str:
+    lines = [
+        "## Metric Changes",
+        "",
+        "Every tracked metric, not just the ones significant enough to be a "
+        "regression or improvement finding — see the `significant` column. "
+        "Score deltas of 5 points or less are within this analysis' documented "
+        "noise floor.",
+        "",
+        "| Metric | Before | After | Delta | Significant |",
+        "|---|---:|---:|---:|:-:|",
+    ]
+    for m in comparison.metric_changes:
+        lines.append(
+            f"| {m.label} | {m.before:g} | {m.after:g} | {m.delta:+.2f} | "
+            f"{'yes' if m.significant else 'no'} |"
+        )
+    return "\n".join(lines)
+
+
+def _comparison_findings(title: str, findings: list[ComparisonFinding]) -> str:
+    lines = [f"## {title}", ""]
+    if not findings:
+        lines.append(f"No {title.lower()} found.")
+        return "\n".join(lines)
+    for f in findings:
+        lines.append(f"- **{f.severity}** [{f.category}] {f.message}")
+    return "\n".join(lines)
+
+
+def _comparison_set_changes(comparison: ComparisonReport) -> str:
+    lines = ["## Set Changes", ""]
+    any_changes = False
+    for s in comparison.set_changes:
+        if not s.added and not s.removed:
+            continue
+        any_changes = True
+        lines.append(f"**{s.label}**")
+        if s.added:
+            lines.append(f"- Added: {', '.join(s.added)}")
+        if s.removed:
+            lines.append(f"- Removed: {', '.join(s.removed)}")
+        lines.append("")
+    if not any_changes:
+        lines.append("No changes in any tracked top-N list.")
+    return "\n".join(lines).rstrip()
+
+
+def _comparison_critical_module_diagram(comparison: ComparisonReport) -> str:
+    criticality = next(
+        (s for s in comparison.set_changes if s.label == "Dependency-criticality top 15"), None
+    )
+    if criticality is None or (not criticality.added and not criticality.removed):
+        return ""
+
+    added = criticality.added[:_COMPARISON_DIAGRAM_CAP]
+    removed = criticality.removed[:_COMPARISON_DIAGRAM_CAP]
+    lines = [
+        "## Critical Module Changes",
+        "",
+        "Modules that entered or left the dependency-criticality top 15 "
+        "between A and B — not a claim about why, just what changed.",
+        "",
+        "```mermaid",
+        "graph LR",
+    ]
+    for i, m in enumerate(added):
+        lines.append(f'    added{i}["+ {PurePath(m).name}"]:::added')
+    for i, m in enumerate(removed):
+        lines.append(f'    removed{i}["- {PurePath(m).name}"]:::removed')
+    lines.append("    classDef added fill:#d4edda,stroke:#28a745")
+    lines.append("    classDef removed fill:#f8d7da,stroke:#dc3545")
+    lines.append("```")
+    return "\n".join(lines)
+
+
+def _comparison_limitations() -> str:
+    return "\n".join(
+        [
+            "## Limitations",
+            "",
+            "- Comparison only works between two completed Atlas jobs (by job "
+            "ID) — there is currently no support for comparing arbitrary "
+            "commits or branches directly; Atlas only clones the HEAD of a "
+            "repo URL.",
+            "- Thresholds (score noise floor, top-N list size) are a "
+            "documented starting point, not empirically tuned against a "
+            "historical comparison dataset.",
+            "- A dependency-criticality or hotspot set change is reported as "
+            "a fact, not classified as a regression or improvement on its "
+            "own — becoming more central isn't inherently good or bad "
+            "without knowing why.",
+            "- Comparing two unrelated repositories (not two runs of the "
+            "same one) is technically possible and will produce a mostly "
+            "\"everything is different\" report — not detected or warned "
+            "about separately.",
         ]
     )

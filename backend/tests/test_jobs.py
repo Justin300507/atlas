@@ -41,6 +41,53 @@ def test_create_job_returns_queued_record(tmp_path):
     assert record.stage is None
     assert record.markdown is None
     assert record.error is None
+    assert record.snapshot is None
+
+
+def test_snapshot_can_be_set_and_read_back(tmp_path):
+    db_path = tmp_path / "jobs.db"
+    job_id = create_job("https://github.com/example/example", db_path=db_path)
+
+    update_job(job_id, status="done", snapshot='{"schema_version": 1}', db_path=db_path)
+    record = get_job(job_id, db_path=db_path)
+
+    assert record is not None
+    assert record.snapshot == '{"schema_version": 1}'
+
+
+def test_snapshot_column_migration_reaches_a_pre_v1_2_database(tmp_path):
+    # Simulates a jobs.db that existed before the snapshot column was
+    # added: a bare CREATE TABLE with none of the v1.2 schema, written
+    # directly rather than through _connect() (which would already apply
+    # the migration). get_job on a row from before the migration should
+    # see snapshot=None, not raise.
+    db_path = tmp_path / "jobs.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """
+        CREATE TABLE jobs (
+            id TEXT PRIMARY KEY,
+            repo_url TEXT NOT NULL,
+            status TEXT NOT NULL,
+            stage TEXT,
+            markdown TEXT,
+            error TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO jobs VALUES ('old-job', 'https://github.com/x/y', 'done', NULL, '# report', NULL, 'now', 'now')"
+    )
+    conn.commit()
+    conn.close()
+
+    record = get_job("old-job", db_path=db_path)
+
+    assert record is not None
+    assert record.snapshot is None
+    assert record.markdown == "# report"
 
 
 def test_get_job_returns_none_for_unknown_id(tmp_path):

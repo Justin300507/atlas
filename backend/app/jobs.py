@@ -29,6 +29,17 @@ CREATE TABLE IF NOT EXISTS jobs (
 )
 """
 
+# v1.2 migration note: `snapshot` (JSON-serialized AnalysisSnapshot, see
+# comparison_engine.py / docs/superpowers/specs/2026-07-24-repository-
+# comparison-design.md) was added after jobs.db existed in the wild --
+# CREATE TABLE IF NOT EXISTS is a no-op on an existing table, so a plain
+# ALTER TABLE is needed to reach existing deployments. Guarded against
+# re-running on a DB that already has the column (SQLite has no
+# "ADD COLUMN IF NOT EXISTS"). A job created before this migration has
+# snapshot=NULL forever -- get_job/CompareRequest treat that as "no
+# snapshot available for comparison", not an error.
+_ADD_SNAPSHOT_COLUMN_SQL = "ALTER TABLE jobs ADD COLUMN snapshot TEXT"
+
 
 @dataclass
 class JobRecord:
@@ -40,6 +51,7 @@ class JobRecord:
     error: str | None
     created_at: str
     updated_at: str
+    snapshot: str | None = None
 
 
 def _resolve_db_path(db_path: Path | None) -> Path:
@@ -80,6 +92,11 @@ def _connect(db_path: Path) -> sqlite3.Connection:
                 raise
             time.sleep(_WAL_SWITCH_RETRY_DELAY_SECONDS)
     conn.execute(_CREATE_TABLE_SQL)
+    try:
+        conn.execute(_ADD_SNAPSHOT_COLUMN_SQL)
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # column already exists -- expected on every connection after the first
     return conn
 
 
@@ -136,6 +153,7 @@ def update_job(
     stage: str | None = None,
     markdown: str | None = None,
     error: str | None = None,
+    snapshot: str | None = None,
     db_path: Path | None = None,
 ) -> None:
     resolved_path = _resolve_db_path(db_path)
@@ -153,6 +171,9 @@ def update_job(
     if error is not None:
         fields.append("error = ?")
         values.append(error)
+    if snapshot is not None:
+        fields.append("snapshot = ?")
+        values.append(snapshot)
     fields.append("updated_at = ?")
     values.append(_now())
     values.append(job_id)
@@ -203,7 +224,7 @@ def get_job(job_id: str, db_path: Path | None = None) -> JobRecord | None:
     conn = _connect(resolved_path)
     try:
         row = conn.execute(
-            "SELECT id, repo_url, status, stage, markdown, error, created_at, updated_at "
+            "SELECT id, repo_url, status, stage, markdown, error, created_at, updated_at, snapshot "
             "FROM jobs WHERE id = ?",
             (job_id,),
         ).fetchone()

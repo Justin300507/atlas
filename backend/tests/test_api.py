@@ -336,6 +336,88 @@ def test_job_runs_synchronously_via_submit_override_and_reaches_done(monkeypatch
     assert "## Executive Summary" in body["markdown"]
 
 
+def _run_synchronous_job(monkeypatch, repo_path, repo_url="https://github.com/example/example") -> str:
+    @contextmanager
+    def fake_clone_with_history(url, depth=500, timeout=120):
+        yield repo_path
+
+    monkeypatch.setattr("app.report_pipeline.clone_with_history", fake_clone_with_history)
+    monkeypatch.setattr("app.main._submit_job", app_main._run_job)
+
+    create_resp = client.post("/jobs", json={"repo_url": repo_url})
+    return create_resp.json()["job_id"]
+
+
+def _init_git_repo(path: Path, filename: str = "a.py", content: str = "1\n") -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=path, check=True, capture_output=True)
+    (path / filename).write_text(content)
+    subprocess.run(["git", "add", filename], cwd=path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=test@test.com", "-c", "user.name=test", "commit", "-m", "init"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+    )
+
+
+def test_compare_two_completed_jobs_returns_markdown_and_comparison(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+
+    job_id_a = _run_synchronous_job(monkeypatch, repo)
+    job_id_b = _run_synchronous_job(monkeypatch, repo)
+
+    resp = client.post("/compare", json={"job_id_a": job_id_a, "job_id_b": job_id_b})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "## Executive Summary" in body["markdown"]
+    assert body["comparison"]["repo_url_a"] == "https://github.com/example/example"
+    assert isinstance(body["comparison"]["metric_changes"], list)
+
+
+def test_compare_returns_404_for_unknown_job(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+    job_id = _run_synchronous_job(monkeypatch, repo)
+
+    resp = client.post("/compare", json={"job_id_a": job_id, "job_id_b": "does-not-exist"})
+
+    assert resp.status_code == 404
+
+
+def test_compare_returns_409_for_a_job_that_is_not_done(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+    done_job_id = _run_synchronous_job(monkeypatch, repo)
+
+    monkeypatch.setattr("app.main._submit_job", lambda job_id, repo_url, request_id=None: None)
+    pending_resp = client.post("/jobs", json={"repo_url": "https://github.com/example/example"})
+    pending_job_id = pending_resp.json()["job_id"]
+
+    resp = client.post("/compare", json={"job_id_a": done_job_id, "job_id_b": pending_job_id})
+
+    assert resp.status_code == 409
+
+
+def test_compare_returns_409_for_a_job_that_predates_the_snapshot_column(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.jobs.DEFAULT_DB_PATH", tmp_path / "jobs.db")
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+    done_job_id = _run_synchronous_job(monkeypatch, repo)
+
+    old_job_id = app_jobs.create_job("https://github.com/example/old", db_path=tmp_path / "jobs.db")
+    app_jobs.update_job(old_job_id, status="done", markdown="# old report", db_path=tmp_path / "jobs.db")
+
+    resp = client.post("/compare", json={"job_id_a": done_job_id, "job_id_b": old_job_id})
+
+    assert resp.status_code == 409
+
+
 def test_analyze_rejects_oversized_repo_url_payload():
     resp = client.post("/analyze", json={"repo_url": "x" * 301})
     assert resp.status_code == 422

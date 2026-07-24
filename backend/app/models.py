@@ -166,3 +166,87 @@ class SemanticReport(BaseModel):
 
 class DocumentationResponse(BaseModel):
     markdown: str
+    snapshot: "AnalysisSnapshot | None" = None
+
+
+# ---------------------------------------------------------------------------
+# Repository Comparison (v1.2) -- see
+# docs/superpowers/specs/2026-07-24-repository-comparison-design.md
+# ---------------------------------------------------------------------------
+
+
+class SnapshotSecuritySummary(BaseModel):
+    critical_count: int
+    important_count: int
+    minor_count: int
+
+
+class SnapshotGitSummary(BaseModel):
+    commits_analyzed: int
+    top_churn_files: list[str]
+
+
+class SnapshotSemanticSummary(BaseModel):
+    circular_cluster_count: int
+    articulation_point_count: int
+    dependency_concentration_top5_ratio: float
+    critical_modules: list[str]
+    hotspot_modules: list[str]
+    coupling_issue_count: int
+    smell_count: int
+
+
+class AnalysisSnapshot(BaseModel):
+    schema_version: int = 1
+    repo_url: str
+    generated_at: str
+    overall_score: int
+    maintainability_score: int
+    architecture_score: int
+    module_count: int
+    import_edge_count: int
+    security: SnapshotSecuritySummary
+    git: SnapshotGitSummary
+    semantic: SnapshotSemanticSummary
+
+
+class MetricChange(BaseModel):
+    label: str
+    before: float
+    after: float
+    delta: float
+    significant: bool
+
+
+class SetChange(BaseModel):
+    label: str
+    added: list[str]
+    removed: list[str]
+
+
+class ComparisonFinding(BaseModel):
+    category: str
+    kind: str  # "regression" or "improvement"
+    message: str
+    severity: str
+
+
+class ComparisonReport(BaseModel):
+    repo_url_a: str
+    repo_url_b: str
+    generated_at_a: str
+    generated_at_b: str
+    metric_changes: list[MetricChange]
+    set_changes: list[SetChange]
+    regressions: list[ComparisonFinding]
+    improvements: list[ComparisonFinding]
+
+
+class CompareRequest(BaseModel):
+    job_id_a: str
+    job_id_b: str
+
+
+class CompareResponse(BaseModel):
+    markdown: str
+    comparison: ComparisonReport
