@@ -17,4 +17,8 @@ RUN mkdir -p /app/data
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form (not exec-form JSON array) so $PORT actually gets substituted --
+# Railway (and most PaaS hosts) inject a dynamic PORT env var and route to
+# it; docker-compose.yml doesn't set PORT, so this falls back to 8000 and
+# local behavior is unchanged.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
