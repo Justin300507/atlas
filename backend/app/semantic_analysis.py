@@ -309,6 +309,14 @@ def _analyze_coupling_and_smells(
     p75_fan_in = _percentile(fan_ins, 75)
     p25_fan_out = _percentile(fan_outs, 25)
 
+    # A single-module repo has fan_in==0 and fan_out==0 by mathematical
+    # necessity -- there's nothing else it could import from or be imported
+    # by. Flagging that as "isolated_component" isn't a finding, it's a
+    # guaranteed side effect of repo size, and would fire on every one-file
+    # repo Atlas ever analyzes. Reported against a real one-file repo
+    # (2026-07-24).
+    single_module_repo = len(metrics) <= 1
+
     coupling_issues: list[CouplingIssue] = []
     smells: list[ArchitecturalSmell] = []
 
@@ -341,14 +349,15 @@ def _analyze_coupling_and_smells(
                 )
 
         if m["fan_in"] == 0 and m["fan_out"] == 0:
-            smells.append(
-                ArchitecturalSmell(
-                    file=rel,
-                    kind="isolated_component",
-                    message="No import edges in either direction -- disconnected from the rest of the import graph",
-                    severity="minor",
+            if not single_module_repo:
+                smells.append(
+                    ArchitecturalSmell(
+                        file=rel,
+                        kind="isolated_component",
+                        message="No import edges in either direction -- disconnected from the rest of the import graph",
+                        severity="minor",
+                    )
                 )
-            )
             continue
 
         is_facade_shape = (

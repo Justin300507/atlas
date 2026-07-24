@@ -5,6 +5,7 @@ import networkx as nx
 from app.code_parser import FileSymbols
 from app.doc_generator import generate_documentation
 from app.models import (
+    ArchitectureHealth,
     DebtModule,
     FileChurn,
     FileCoverage,
@@ -15,7 +16,9 @@ from app.models import (
     QualityReport,
     SecurityIssue,
     SecurityReport,
+    SemanticReport,
     StackReport,
+    SubsystemOverview,
     TechnicalDebtReport,
 )
 
@@ -53,6 +56,34 @@ def test_executive_summary_reports_stack_and_scores():
     assert "PostgreSQL" in doc
     assert "Files analyzed: 1" in doc
     assert "100" in doc
+
+
+def test_executive_summary_discloses_security_findings_separately_from_quality_score():
+    # Regression test: "Overall quality: 100/100" immediately followed by a
+    # critical security finding read as contradictory to a real reader --
+    # the score never included security, but nothing said so. Reported
+    # against a real one-file repo (2026-07-24).
+    files = [_file("app/main.py")]
+    graph = nx.DiGraph()
+    graph.add_node(str(REPO_ROOT / "app/main.py"), type="module")
+    security = SecurityReport(
+        issues=[
+            SecurityIssue(file="app/main.py", line=1, kind="dangerous_execution", message="x", severity="critical")
+        ]
+    )
+
+    doc = generate_documentation(REPO_ROOT, StackReport(), files, graph, _empty_quality(), security, _empty_git())
+
+    assert "Overall quality score: 100/100" in doc
+    assert "Security findings: 1 critical, 0 important, 0 minor -- not reflected in the score above" in doc
+
+
+def test_executive_summary_reports_no_security_findings_when_clean():
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [_file("app/main.py")], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git()
+    )
+
+    assert "Security findings: none detected -- not reflected in the score above" in doc
 
 
 def test_executive_summary_omits_coverage_note_when_not_capped():
@@ -112,6 +143,35 @@ def test_directory_guide_groups_by_top_level_directory():
     assert "## Directory Guide" in doc
     assert "app" in doc
     assert "scripts" in doc
+
+
+def test_architecture_overview_shows_size_note_for_single_module_repo():
+    # Regression test: "Modules: 1 / Import edges: 0 / Routes: 0" isn't a
+    # finding for a one-file repo, it's a guaranteed consequence of size.
+    # Reported against a real one-file repo (2026-07-24).
+    graph = nx.DiGraph()
+    graph.add_node(str(REPO_ROOT / "only.py"), type="module")
+
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [_file("only.py")], graph, _empty_quality(), _empty_security(), _empty_git()
+    )
+
+    assert "## Architecture Overview" in doc
+    assert "too small for meaningful architecture" in doc
+    assert "Modules: 1" not in doc
+
+
+def test_directory_guide_shows_sentence_not_table_for_single_directory():
+    # Regression test: a one-row table ("." | 1) is the same fact as
+    # "Files analyzed: 1" restated as a table -- not a breakdown. Reported
+    # against a real one-file repo (2026-07-24).
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [_file("only.py")], nx.DiGraph(), _empty_quality(), _empty_security(), _empty_git()
+    )
+
+    assert "## Directory Guide" in doc
+    assert "| Directory | Files |" not in doc
+    assert "not enough directory structure for a breakdown" in doc
 
 
 def test_architecture_overview_ranks_most_depended_upon_module():
@@ -275,6 +335,36 @@ def test_empty_repo_renders_without_crashing():
         "## Analysis Coverage",
     ):
         assert header in doc
+
+
+def _single_module_semantic() -> SemanticReport:
+    return SemanticReport(
+        architecture_health=ArchitectureHealth(
+            module_count=1, import_edge_count=0, circular_cluster_count=0,
+            articulation_point_count=0, bridge_count=0, betweenness_computed=True,
+            dependency_concentration_top5_ratio=0.0,
+        ),
+        critical_modules=[],
+        subsystem_overview=SubsystemOverview(confident=False, coverage_ratio=0.0, layer_counts={}, layer_edges=[]),
+        hotspots=[],
+        coupling_issues=[],
+        architectural_smells=[],
+    )
+
+
+def test_architecture_health_shows_size_note_for_single_module_repo():
+    # Regression test: dependency concentration ("top 5 modules receive 0%")
+    # and the rest of Architecture Health are all trivially zero/undefined
+    # for a one-module repo. Reported against a real one-file repo
+    # (2026-07-24).
+    doc = generate_documentation(
+        REPO_ROOT, StackReport(), [_file("only.py")], nx.DiGraph(), _empty_quality(), _empty_security(),
+        _empty_git(), semantic=_single_module_semantic(),
+    )
+
+    assert "## Architecture Health" in doc
+    assert "require more than one module" in doc
+    assert "receive" not in doc.split("## Architecture Health")[1].split("##")[0]
 
 
 def test_technical_debt_section_only_appears_when_debt_provided():

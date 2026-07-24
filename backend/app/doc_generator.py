@@ -42,7 +42,7 @@ def generate_documentation(
     performance: PerformanceReport | None = None,
 ) -> str:
     sections = [
-        _executive_summary(stack, files, quality, git_report, coverage),
+        _executive_summary(stack, files, quality, security, git_report, coverage),
         _architecture_overview(graph),
     ]
     if semantic is not None:
@@ -85,6 +85,7 @@ def _executive_summary(
     stack: StackReport,
     files: list[FileSymbols],
     quality: QualityReport,
+    security: SecurityReport,
     git_report: GitIntelligenceReport,
     coverage: FileCoverage | None = None,
 ) -> str:
@@ -103,9 +104,25 @@ def _executive_summary(
         f"- Overall quality score: {quality.overall_score}/100 "
         f"(maintainability {quality.maintainability_score}, architecture {quality.architecture_score})"
     )
+    # A reader who sees "100/100" and only later scrolls to a critical
+    # security finding reasonably reads that as contradictory -- the score
+    # never included security to begin with, but nothing said so. State it
+    # explicitly, right next to the score, every time. Reported by a user
+    # reading a real one-file repo's report (2026-07-24).
+    lines.append(f"- Security findings: {_security_summary(security)} -- not reflected in the score above")
     truncation_note = " (history truncated)" if git_report.history_truncated else ""
     lines.append(f"- Commits analyzed: {git_report.commits_analyzed}{truncation_note}")
     return "\n".join(lines)
+
+
+def _security_summary(security: SecurityReport) -> str:
+    counts = {"critical": 0, "important": 0, "minor": 0}
+    for issue in security.issues:
+        if issue.severity in counts:
+            counts[issue.severity] += 1
+    if not security.issues:
+        return "none detected"
+    return f"{counts['critical']} critical, {counts['important']} important, {counts['minor']} minor"
 
 
 def _coverage_note(coverage: FileCoverage | None) -> str:
@@ -125,6 +142,24 @@ def _architecture_overview(graph: nx.DiGraph) -> str:
     module_nodes = [n for n, d in graph.nodes(data=True) if d.get("type") == "module"]
     route_nodes = [n for n, d in graph.nodes(data=True) if d.get("type") == "route"]
     import_edges = [1 for _, _, d in graph.edges(data=True) if d.get("type") == "import"]
+
+    if len(module_nodes) <= 1:
+        # A single module has zero possible import edges by definition --
+        # showing "Modules: 1 / Import edges: 0 / Routes: 0" isn't a
+        # finding, it's a guaranteed consequence of size. Say so instead of
+        # implying the analysis ran and came up empty. Reported against a
+        # real one-file repo (2026-07-24).
+        return "\n".join(
+            [
+                "## Architecture Overview",
+                "",
+                "Repository has 1 module or fewer -- too small for "
+                "meaningful architecture/dependency-graph analysis. "
+                "Import-graph metrics below (dependency concentration, "
+                "coupling, criticality ranking) are omitted rather than "
+                "shown as trivially zero.",
+            ]
+        )
 
     lines = [
         "## Architecture Overview",
@@ -148,6 +183,21 @@ def _architecture_overview(graph: nx.DiGraph) -> str:
 
 def _architecture_health(semantic: SemanticReport) -> str:
     h = semantic.architecture_health
+    if h.module_count <= 1:
+        # Circular clusters, articulation points, bridges, and dependency
+        # concentration are all trivially zero for a single-module repo --
+        # matches the Architecture Overview note above, not a separate
+        # "insufficient evidence" case.
+        return "\n".join(
+            [
+                "## Architecture Health",
+                "",
+                "Repository has 1 module or fewer -- architecture-health "
+                "metrics (circular clusters, articulation points, bridges, "
+                "dependency concentration) require more than one module to "
+                "be meaningful and are omitted here.",
+            ]
+        )
     lines = [
         "## Architecture Health",
         "",
@@ -361,6 +411,14 @@ def _directory_guide(repo_root: Path, files: list[FileSymbols]) -> str:
     lines = ["## Directory Guide", ""]
     if not counts:
         lines.append("No files detected.")
+        return "\n".join(lines)
+    if len(counts) == 1:
+        # A one-row table ("." | 1) isn't a breakdown -- it's the same fact
+        # ("Files analyzed") restated as a table. Say it as a sentence
+        # instead. Reported against a real one-file repo (2026-07-24).
+        (only_dir, only_count) = next(iter(counts.items()))
+        location = "the repository root" if only_dir == "." else f"`{only_dir}`"
+        lines.append(f"All {only_count} file(s) are in {location} -- not enough directory structure for a breakdown.")
         return "\n".join(lines)
 
     lines.append("| Directory | Files |")

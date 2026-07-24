@@ -269,6 +269,18 @@ def test_isolated_component_has_zero_fan_in_and_fan_out():
     assert any(s.file == "orphan.py" for s in isolated)
 
 
+def test_isolated_component_not_flagged_for_single_module_repo():
+    # Regression test: a one-file repo's sole module trivially has
+    # fan_in==0 and fan_out==0 -- that's a guaranteed consequence of size,
+    # not a finding. Reported against a real one-file repo (2026-07-24).
+    graph = nx.DiGraph()
+    graph.add_node("only.py", type="module")
+
+    report = analyze_semantics([_file("only.py")], graph, _empty_quality(), [])
+
+    assert report.architectural_smells == []
+
+
 def test_facade_pattern_detected_for_init_file_with_high_fan_in_low_fan_out():
     graph = nx.DiGraph()
     importers = [f"caller{i}.py" for i in range(8)]
