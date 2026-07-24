@@ -55,6 +55,13 @@ def _clone_to(source: str, dest: str, timeout: int) -> None:
 
 @contextmanager
 def shallow_clone(url: str, timeout: int = 60):
+    # validate_github_url only strips for its own regex check -- it doesn't
+    # return a normalized value, so a leading/trailing space (e.g. a
+    # copy-paste artifact) passed validation but was still handed to `git
+    # clone` verbatim, which fails with a confusing "protocol '
+    # https' is not supported" error. Strip once, here, before either
+    # validating or cloning.
+    url = url.strip()
     validate_github_url(url)
     tmp_dir = tempfile.mkdtemp(prefix="atlas-clone-")
     try:
@@ -78,6 +85,7 @@ def _clone_history_to(source: str, dest: str, depth: int, timeout: int) -> None:
 
 @contextmanager
 def clone_with_history(url: str, depth: int = 500, timeout: int = 120):
+    url = url.strip()  # see shallow_clone's comment above
     validate_github_url(url)
     tmp_dir = tempfile.mkdtemp(prefix="atlas-clone-history-")
     try:

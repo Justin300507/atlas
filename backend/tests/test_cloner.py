@@ -49,6 +49,41 @@ def test_clone_to_raises_on_missing_source(tmp_path):
         _clone_to(str(tmp_path / "does_not_exist"), str(dest), timeout=30)
 
 
+def test_shallow_clone_strips_whitespace_before_invoking_git(monkeypatch, tmp_path):
+    # Regression test: a leading/trailing space (e.g. a copy-paste artifact)
+    # passed validate_github_url's own strip-for-regex check but was handed
+    # to `git clone` verbatim, which failed with a confusing "protocol '
+    # https' is not supported" error -- reported live against the running
+    # app (2026-07-24).
+    captured = {}
+
+    def fake_clone_to(source, dest, timeout):
+        captured["source"] = source
+        Path(dest).mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr("app.cloner._clone_to", fake_clone_to)
+
+    with shallow_clone(" https://github.com/octocat/Hello-World  "):
+        pass
+
+    assert captured["source"] == "https://github.com/octocat/Hello-World"
+
+
+def test_clone_with_history_strips_whitespace_before_invoking_git(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_clone_history_to(source, dest, depth, timeout):
+        captured["source"] = source
+        Path(dest).mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr("app.cloner._clone_history_to", fake_clone_history_to)
+
+    with clone_with_history(" https://github.com/octocat/Hello-World\n"):
+        pass
+
+    assert captured["source"] == "https://github.com/octocat/Hello-World"
+
+
 def test_shallow_clone_cleans_up_temp_dir(monkeypatch, tmp_path):
     captured = {}
 

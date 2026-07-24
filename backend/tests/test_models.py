@@ -3,6 +3,7 @@ from app.models import (
     AnalyzeResponse,
     CoChangePair,
     DocumentationResponse,
+    ExplanationRequest,
     FileChurn,
     FileCoverage,
     FileOwnership,
@@ -10,6 +11,7 @@ from app.models import (
     GraphEdge,
     GraphNode,
     GraphResponse,
+    MentorRequest,
     QualityIssue,
     QualityReport,
     SecurityIssue,
@@ -26,6 +28,30 @@ def test_stack_report_defaults_to_none():
 
 def test_analyze_request_requires_repo_url():
     request = AnalyzeRequest(repo_url="https://github.com/example/example")
+    assert request.repo_url == "https://github.com/example/example"
+
+
+def test_analyze_request_strips_whitespace_from_repo_url():
+    # Regression test: a copy-pasted URL with leading/trailing whitespace
+    # passed cloner.py's own validation (which strips only for its regex
+    # check) but was then handed to `git clone` verbatim, crashing with a
+    # confusing "protocol ' https' is not supported" error -- reported live
+    # against the running app (2026-07-24).
+    request = AnalyzeRequest(repo_url="  https://github.com/example/example\n")
+    assert request.repo_url == "https://github.com/example/example"
+
+
+def test_explanation_request_strips_whitespace_from_repo_url():
+    request = ExplanationRequest(repo_url=" https://github.com/example/example ")
+    assert request.repo_url == "https://github.com/example/example"
+
+
+def test_mentor_request_strips_whitespace_from_repo_url():
+    request = MentorRequest(
+        repo_url=" https://github.com/example/example ",
+        finding_file="a.py",
+        finding_kind="dangerous_execution",
+    )
     assert request.repo_url == "https://github.com/example/example"
 
 

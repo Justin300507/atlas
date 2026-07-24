@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class FileCoverage(BaseModel):
@@ -64,6 +64,17 @@ class SecurityReport(BaseModel):
 
 class AnalyzeRequest(BaseModel):
     repo_url: str = Field(max_length=300)
+
+    # A pasted/copy-pasted URL with leading or trailing whitespace passed
+    # cloner.py's own validation (which strips only for its regex check)
+    # but was then handed to `git clone` verbatim, crashing with a
+    # confusing "protocol ' https' is not supported" error. Normalizing
+    # once here means every endpoint that takes a repo_url -- not just the
+    # clone call -- stores/displays/dedupes on the same clean value.
+    @field_validator("repo_url")
+    @classmethod
+    def _strip_repo_url(cls, v: str) -> str:
+        return v.strip()
 
 
 class AnalyzeResponse(BaseModel):
@@ -306,11 +317,21 @@ class ExplanationRequest(BaseModel):
     prompt_kind: str = "repository_overview"
     file: str | None = None  # required by prompt_kinds scoped to one module
 
+    @field_validator("repo_url")
+    @classmethod
+    def _strip_repo_url(cls, v: str) -> str:  # see AnalyzeRequest's validator
+        return v.strip()
+
 
 class MentorRequest(BaseModel):
     repo_url: str = Field(max_length=300)
     finding_file: str
     finding_kind: str
+
+    @field_validator("repo_url")
+    @classmethod
+    def _strip_repo_url(cls, v: str) -> str:  # see AnalyzeRequest's validator
+        return v.strip()
 
 
 class ExplanationResponse(BaseModel):
