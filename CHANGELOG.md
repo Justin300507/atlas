@@ -29,6 +29,32 @@ on what "evidence-driven" could actually mean yet).
   operator had no way to confirm a production env var was actually read
   short of triggering a real cross-origin request. Now logged as one
   INFO line at startup.
+- `docker-validate.yml` had a real, reproducible CI race: the frontend
+  container had no Docker healthcheck, so `docker compose up --wait`
+  considered it "ready" the moment the container started, not once
+  nginx had actually finished its entrypoint scripts and started
+  serving. Root-caused from the actual `docker compose logs` output of
+  a failed run, not assumed. Added a curl-based healthcheck (installed
+  explicitly rather than assumed present) plus a bounded retry on the
+  workflow's own check as defense-in-depth. Verified fixed via a live
+  CI run, not just static review.
+
+### Dependencies
+
+First Dependabot run (`.github/dependabot.yml`, added this session)
+opened 10 PRs. Triaged individually rather than bulk-merged:
+
+- Merged 9: GitHub Actions (`checkout`, `setup-node`, `setup-python` to
+  v7), `pydantic`, `fastapi`, `pytest` (8→9), `ruff`, `typescript`
+  (6→7), `@types/node` — all fully green across backend/frontend/
+  docker-validate CI, then re-verified locally after merge (full test
+  suites, lint, typecheck, build all still pass with the bumped
+  versions installed).
+- Closed 1: `tree-sitter` 0.21.3→0.26.0. Confirmed via CI logs to break
+  the parser (`tree-sitter-languages` 1.10.2 depends on a `Language()`
+  constructor signature removed in tree-sitter 0.22+) — 17 real test
+  failures, not a fluke. `tree-sitter==0.21.3` is pinned exactly for
+  this reason; left as a known constraint, not merged.
 
 ## [Public Beta] - 2026-07-24
 
