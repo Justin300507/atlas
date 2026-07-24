@@ -152,6 +152,7 @@ def test_on_stage_called_with_every_stage_in_order(monkeypatch, tmp_path):
         "analyzing_quality",
         "scanning_security",
         "analyzing_git_history",
+        "analyzing_semantics",
         "generating_documentation",
     ]
     assert "## Executive Summary" in response.markdown

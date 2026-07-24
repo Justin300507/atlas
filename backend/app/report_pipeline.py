@@ -21,6 +21,7 @@ from .models import (
 )
 from .quality_engine import analyze_quality
 from .security_scanner import scan_files
+from .semantic_analysis import analyze_semantics
 from .stack_detector import detect
 
 # Bounds on parsing arbitrary cloned repos: this pipeline clones and parses
@@ -166,8 +167,11 @@ def run_full_analysis(
         commits, history_truncated = parse_git_log(repo_path, max_commits=_GIT_HISTORY_COMMITS)
         git_report = analyze_git_history(commits, history_truncated)
 
+        notify("analyzing_semantics")
+        semantic = analyze_semantics(files, graph, quality, commits, repo_root=repo_path)
+
     notify("generating_documentation")
     markdown = generate_documentation(
-        repo_root, stack, files, graph, quality, security, git_report, coverage
+        repo_root, stack, files, graph, quality, security, git_report, coverage, semantic
     )
     return DocumentationResponse(markdown=markdown)

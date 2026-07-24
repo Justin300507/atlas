@@ -13,6 +13,7 @@ const STAGES = [
   "analyzing_quality",
   "scanning_security",
   "analyzing_git_history",
+  "analyzing_semantics",
   "generating_documentation",
 ];
 
@@ -23,6 +24,7 @@ const STAGE_LABELS: Record<string, string> = {
   analyzing_quality: "Analyzing code quality",
   scanning_security: "Scanning for security issues",
   analyzing_git_history: "Analyzing git history",
+  analyzing_semantics: "Analyzing architecture",
   generating_documentation: "Generating documentation",
 };
 
