@@ -6,6 +6,13 @@
 Software Intelligence Platform — paste a GitHub repo, get a full engineering
 review instead of a chatbot.
 
+**Try it live: [frontend-alpha-brown-16.vercel.app](https://frontend-alpha-brown-16.vercel.app)**
+(frontend on Vercel, backend on Railway — see [`DEPLOYMENT.md`](DEPLOYMENT.md)
+for the setup, including the two real deploy issues found doing this for
+real: a hardcoded port that ignored the platform's injected `$PORT`, and a
+Railway root-directory setting that silently didn't apply to a monorepo
+build until re-triggered from a fresh commit.)
+
 Atlas analyzes GitHub repositories to reveal architecture, dependency
 relationships, code quality, Git history insights, security findings, and
 engineering documentation — using deterministic software analysis, not an
