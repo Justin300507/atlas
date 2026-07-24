@@ -92,8 +92,12 @@ def test_betweenness_skipped_above_module_count_ceiling(monkeypatch):
 
 def test_real_ceiling_constant_is_unchanged_by_default():
     # Guards against silently loosening/tightening the measured constant
-    # without updating the design spec's rationale alongside it.
-    assert _MAX_MODULES_FOR_BETWEENNESS == 3000
+    # without updating the design spec's rationale alongside it. 5500 was
+    # picked after measuring real betweenness cost on django/django (3038
+    # modules, 4.28s) and facebook/react (4482 modules, 6.88s) -- both
+    # trivial, and report_pipeline's 5,000-file analysis cap means
+    # module_count can never actually exceed this ceiling in practice.
+    assert _MAX_MODULES_FOR_BETWEENNESS == 5500
 
 
 def test_critical_modules_ranks_fan_in_weighted_betweenness_above_plain_fan_in():

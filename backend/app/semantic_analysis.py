@@ -22,13 +22,21 @@ from .models import (
 # See docs/superpowers/specs/2026-07-24-semantic-repository-intelligence-design.md
 # for the full rationale behind every threshold/algorithm choice below.
 
-# Betweenness centrality is O(V*(V+E)) (Brandes' algorithm) -- measured
-# against real repos during validation of this feature; see that
-# session's commits/report for the actual timings that picked this
-# number. Above this module count, betweenness/closeness are skipped and
+# Betweenness centrality is O(V*(V+E)) (Brandes' algorithm). Measured
+# directly against real repos during validation of this feature:
+# django/django (3038 modules, 8787 import edges) took 4.28s, and
+# facebook/react (4482 modules, 3527 edges) took 6.88s -- both trivial
+# next to the 40-80s clone+parse time those repos already cost. Since
+# report_pipeline._MAX_FILES_PER_REPO already hard-caps any single
+# analysis at 5,000 source files (so module_count can never exceed
+# that), this ceiling is set comfortably above it: it exists as a
+# defensive backstop against a pathological route-heavy or future-
+# uncapped scenario, not because 5,000 real modules is actually
+# expensive -- measurement said it isn't. Above this ceiling,
+# betweenness/closeness are skipped and
 # ArchitectureHealth.betweenness_computed reports False rather than
 # silently taking a long time.
-_MAX_MODULES_FOR_BETWEENNESS = 3000
+_MAX_MODULES_FOR_BETWEENNESS = 5500
 
 _LAYER_VOCABULARY: list[tuple[str, set[str]]] = [
     ("presentation", {"presentation", "ui", "views", "templates", "components"}),
