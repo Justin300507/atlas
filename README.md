@@ -1,5 +1,6 @@
 # Atlas
 
+[![CI](https://github.com/Justin300507/atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/Justin300507/atlas/actions/workflows/ci.yml)
 [![Docker validate](https://github.com/Justin300507/atlas/actions/workflows/docker-validate.yml/badge.svg)](https://github.com/Justin300507/atlas/actions/workflows/docker-validate.yml)
 
 Software Intelligence Platform — paste a GitHub repo, get a full engineering
